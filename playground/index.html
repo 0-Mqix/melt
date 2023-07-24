@@ -1,0 +1,56 @@
+<imports>
+  Bruh bruh.html
+</imports>
+
+
+<style>
+  main {
+    display: flex;
+    flex-direction: column;
+  }
+</style>
+
+<ThisComponentDoesNotExist />
+<ThisComponentDoesNotExist />
+
+<div>
+  monke 1 says:
+  <Bruh .Reason="ooga" />!
+  monke 2 says:
+  <Bruh .Reason="booga" />!
+</div>
+
+<main>
+  <Bruh .Reason="max" />
+  <Header />
+  <div class="user">
+    <div id="user-id">1</div>
+    {{$abc:="john"}}
+    <div>{{ $abc }}</div>
+    <div class="user-name">{{.User.Name}}</div>
+    <div class="monke">is a monkey!</div>
+    <div>hi</div>
+  </div>
+  <button data-hx-post="/click">click to confirm</button>
+  <Bruh .Reason=.Yeet />
+</main>
+<Bruh .Reason="jungle" />
+
+<style>
+  .user {
+    display: flex;
+    flex-direction: column;
+
+    #user-id {
+      border: solid black 1px;
+    }
+
+    .user-name {
+      font-weight: bold;
+    }
+
+    div {
+      background-color: lightblue;
+    }
+  }
+</style>
