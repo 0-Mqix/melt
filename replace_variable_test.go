@@ -81,7 +81,14 @@ func TestReplaceTemplateVariables(t *testing.T) {
 	}
 
 	for _, c := range tests {
-		result := replaceTemplateVariables(c.Input, c.Arguments)
+
+		arguments := make(map[string]Argument)
+		for k, v := range c.Arguments {
+			arguments[k] = Argument{Value: v, Type: ArgumentTypeVariable}
+		}
+
+		result := replaceTemplateVariables(c.Input, arguments)
+
 		if c.Expected != result {
 			t.Fatalf("failed case:\n Input:\t\t%s\n Expected:\t%s\n Output:\t%s\n Arguments: %v\n", c.Input, c.Expected, result, c.Arguments)
 		}

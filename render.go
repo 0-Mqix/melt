@@ -2,6 +2,7 @@ package melt
 
 import (
 	"bytes"
+	"encoding/base32"
 	"encoding/hex"
 	"fmt"
 	"html/template"
@@ -10,14 +11,16 @@ import (
 	"strings"
 
 	sass "github.com/bep/godartsass/v2"
+	formatter "github.com/yosssi/gohtml"
 	"golang.org/x/net/html"
 )
 
 var (
-	transformedComponentRegex = regexp.MustCompile(`(?m)(?m)melt-component-(.*?)\((.*?)\)`)
-	componentRegex            = regexp.MustCompile(`(?m)\<(?P<name>[A-Z][a-zA-Z0-9-_]+)(?P<attributes>\s+[^\>]*|)\/>`)
-	styleLastSelectorRegex    = regexp.MustCompile(`(?m)([\w-]+)\s*{`)
-	TemplateFunctionRegex     = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}`)
+	componentRegex         = regexp.MustCompile(`(?m)<(?P<name>[A-Z][a-zA-Z0-9-_]+)(?P<attributes>(?:[^>"]+|"[^"]*")*|)\/>`)
+	styleLastSelectorRegex = regexp.MustCompile(`(?m)([^{}]+)\s*(?:{)`)
+	TemplateFunctionRegex  = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}`)
+
+	encoder = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz123456").WithPadding(base32.NoPadding)
 )
 
 type Import struct {
@@ -34,48 +37,6 @@ func getStyle(n *html.Node) (string, bool) {
 }
 
 func applyStyleId(n *html.Node, styleId string, selectors map[string]bool) {
-	found := false
-	var class *html.Attribute
-	var index int
-
-	if n.Type == html.ElementNode && selectors[n.Data] {
-		found = true
-	}
-
-	for i, a := range n.Attr {
-		if !(a.Key == "class" || a.Key == "id") {
-			continue
-		}
-
-		if a.Key == "class" {
-			class = &a
-			index = i
-		}
-
-		for _, k := range strings.Split(a.Val, " ") {
-
-			if !selectors[k] {
-				continue
-			}
-
-			found = true
-		}
-	}
-
-	if found {
-		replacement := html.Attribute{
-			Key:       "class",
-			Val:       styleId,
-			Namespace: n.Namespace,
-		}
-
-		if class != nil {
-			replacement.Val = class.Val + " " + styleId
-			n.Attr[index] = replacement
-		} else {
-			n.Attr = append(n.Attr, replacement)
-		}
-	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		applyStyleId(c, styleId, selectors)
@@ -128,14 +89,15 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 	/// STEP: CHANGE COMPONENT CALLS
 	var usedComponents []string
 	raw = componentRegex.ReplaceAllFunc(raw, func(b []byte) []byte {
-		v := componentRegex.FindStringSubmatch(string(b))
+		data := componentRegex.FindStringSubmatch(string(b))
 
-		attributes := hex.EncodeToString([]byte(v[2]))
+		name := encoder.EncodeToString([]byte(data[1]))
+		attributes := encoder.EncodeToString([]byte(data[2]))
 
-		id := "melt-component-" + v[1] + "(" + attributes + ")"
-		usedComponents = append(usedComponents, id)
+		replacement := fmt.Sprint("<melt-" + name + "-" + attributes + "></melt-" + name + "-" + attributes + ">")
+		usedComponents = append(usedComponents, "<melt-"+name+"-"+attributes+">", "</melt-"+name+"-"+attributes+">")
 
-		return []byte(id)
+		return []byte(replacement)
 	})
 
 	/// STEP: HIDE TEMPLATING
@@ -186,6 +148,7 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 	for _, n := range melted {
 		html.Render(meltedBuffer, n)
 	}
+
 	document, _ = html.Parse(meltedBuffer)
 
 	// STEP: TRANSPILE SCSS WITH DART SASS
@@ -221,7 +184,9 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 		return selector + "." + styleId + "{"
 	})
 
-	applyStyleId(document, styleId, selectors)
+	fmt.Println(selectors)
+
+	// applyStyleId(document, styleId, selectors)
 
 	//STEP: USE COMPONENTS
 	styles := make(map[string]string)
@@ -238,7 +203,10 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 	}
 
 	templateString := templateBuffer.String()
-	document, _ = html.Parse(templateBuffer)
+
+	for _, component := range usedComponents {
+		templateString = strings.ReplaceAll(templateString, component, "")
+	}
 
 	// STEP: CREATE RESULT
 	for _, s := range styles {
@@ -250,6 +218,9 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 		Template: template.New(name),
 	}
 
+	// STEP: EXTRACT NODES
+	templateBuffer = bytes.NewBufferString(templateString)
+	document, _ = html.Parse(templateBuffer)
 	extractFromFakeBody(document, &result.Nodes)
 
 	/// STEP: RENDER TEMPLATE FUNCTIONS
@@ -258,8 +229,14 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 		return "{{" + string(value) + "}}"
 	})
 
+	// STEP: FORMAT HTML
+	formatter.Condense = true
+	templateString = formatter.Format(templateString)
+
 	// STEP: PARSE TEMPLATE FINALY
 	result.Template.Parse(templateString)
+
+	fmt.Println(templateString)
 
 	return result, nil
 }

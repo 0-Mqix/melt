@@ -9,19 +9,57 @@ import (
 	"golang.org/x/net/html"
 )
 
+func SplitIgnoreString(s string, sep rune) []string {
+	var result []string
+	var part string
+	var in bool
+
+	for _, c := range s {
+
+		if c == '"' {
+			in = !in
+			part += string(c)
+			continue
+		}
+
+		if !in && c == sep {
+			result = append(result, part)
+			part = ""
+			continue
+		}
+
+		part += string(c)
+	}
+
+	result = append(result, part)
+
+	return result
+}
+
+type Argument struct {
+	Value string
+	Type  int
+}
+
+const (
+	ArgumentTypeVariable = iota
+	ArgumentTypeConstant
+)
+
 func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes string) {
 	buffer := bytes.NewBufferString("")
-	arguments := make(map[string]string)
 	declarations := ""
 
-	for _, attribute := range strings.Split(attributes, " ") {
+	arguments := make(map[string]Argument)
+
+	for _, attribute := range SplitIgnoreString(attributes, ' ') {
 		attribute = strings.TrimSpace(attribute)
 
 		if len(attribute) == 0 {
 			continue
 		}
 
-		pair := strings.Split(attribute, "=")
+		pair := SplitIgnoreString(attribute, '=')
 		if len(pair) != 2 {
 			continue
 		}
@@ -29,15 +67,35 @@ func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes 
 		name := pair[0]
 		value := pair[1]
 
-		id := f.lastArgumentId.Load()
-		argument := fmt.Sprintf("$arg%d", id)
-		arguments[name] = argument
+		switch name[0] {
 
-		declaration := fmt.Sprintf("%s := %s", argument, value)
-		encoded := hex.EncodeToString([]byte(declaration))
-		declarations += fmt.Sprintf("{{%s}}", encoded)
+		case '.', '$':
 
-		f.lastArgumentId.Add(1)
+			if !(value[0] == '.' || value[1] == '$') {
+				value = strings.Trim(value, "\"")
+
+				value = TemplateFunctionRegex.ReplaceAllStringFunc(value, func(s string) string {
+					return "{{" + hex.EncodeToString([]byte(s[2:len(s)-2])) + "}}"
+				})
+
+				arguments[name] = Argument{Value: value, Type: ArgumentTypeConstant}
+				continue
+			}
+
+			id := f.lastArgumentId.Load()
+			argument := fmt.Sprintf("$arg%d", id)
+			arguments[name] = Argument{Value: argument, Type: ArgumentTypeVariable}
+
+			declaration := fmt.Sprintf("%s := %s", argument, value)
+			encoded := hex.EncodeToString([]byte(declaration))
+			declarations += fmt.Sprintf("{{%s}}", encoded)
+
+			f.lastArgumentId.Add(1)
+
+		case '&':
+			// fmt.Println(name, value)
+		}
+
 	}
 
 	for _, part := range component.Nodes {
@@ -46,13 +104,18 @@ func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes 
 
 	argumented := TemplateFunctionRegex.ReplaceAllStringFunc(buffer.String(), func(s string) string {
 		b, _ := hex.DecodeString(s[2 : len(s)-2])
-		content := string(b)
 
-		fmt.Println("original:", content)
+		content := strings.TrimSpace(string(b))
+
+		argument, ok := arguments[content]
+
+		if ok && argument.Type == ArgumentTypeConstant {
+			fmt.Println("argument", content, argument.Value)
+			return argument.Value
+		}
+
 		content = replaceTemplateVariables(content, arguments)
-		fmt.Println("replaced:", content)
 		content = hex.EncodeToString([]byte(content))
-		fmt.Println("hex:", content)
 
 		return "{{" + content + "}}"
 	})
@@ -66,11 +129,11 @@ func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes 
 
 	for _, part := range nodes {
 		part.Parent.RemoveChild(part)
-		n.Parent.InsertBefore(part, n)
+		n.AppendChild(part)
 	}
 }
 
-func replaceTemplateVariables(s string, arguments map[string]string) string {
+func replaceTemplateVariables(s string, arguments map[string]Argument) string {
 Start:
 	begin := 0
 	selecting := false
@@ -97,7 +160,7 @@ Start:
 			if !ok {
 				goto Continue
 			}
-			return s[:begin] + replacement
+			return s[:begin] + replacement.Value
 
 		} else {
 			end := i
@@ -113,10 +176,10 @@ Start:
 				}
 
 				if end-begin-1 == len(s) {
-					return replacement
+					return replacement.Value
 				}
 
-				s = s[:begin] + replacement + s[end+1:]
+				s = s[:begin] + replacement.Value + s[end+1:]
 				goto Start
 			}
 		}
@@ -133,99 +196,36 @@ func textNode(data string) *html.Node {
 }
 
 func (f *Furnace) useComponents(n *html.Node, imports map[string]*Import, styles map[string]string) {
-	delete := false
-	if n.Type == html.NodeType(html.TextNode) {
-		matches := transformedComponentRegex.FindAllStringSubmatch(n.Data, -1)
+	if n.Type == html.ElementNode && strings.Index(n.Data, "melt-") == 0 {
 
-		if len(matches) == 0 {
-			goto Skip
+		data := strings.Split(n.Data, "-")
+
+		result, _ := encoder.DecodeString(data[1])
+		name := string(result)
+
+		result, _ = encoder.DecodeString(data[2])
+		attributes := string(result)
+
+		source, ok := imports[name]
+
+		var component *Component
+
+		if !ok {
+			goto Next
 		}
 
-		delete = true
+		component, ok = f.GetComponent(source.Path)
 
-		type Paste struct {
-			Component  *Component
-			Attributes string
-			Index      int
-			Raw        string
-			Name       string
+		if !ok {
+			goto Next
 		}
 
-		paste := make([]*Paste, 0)
-		position := 0
-
-		for _, result := range matches {
-			raw, err := hex.DecodeString(result[2])
-
-			if err != nil {
-				fmt.Println("[MELT]", err)
-				continue
-			}
-
-			attributes := string(raw)
-			name := result[1]
-			source, ok := imports[name]
-
-			var component *Component
-
-			if !ok {
-				goto Paste
-			}
-
-			fmt.Println("\nimport: ", source.Path)
-			fmt.Println(name, attributes)
-			component, ok = f.GetComponent(source.Path)
-
-			if !ok {
-				goto Paste
-			}
-
-			styles[source.Path] = component.Style
-
-		Paste:
-			i := len(paste) - 1
-
-			if i > -1 {
-				offset := position + len(paste[i].Raw)
-				position = offset + strings.Index(n.Data[offset:], result[0])
-			} else {
-				position = strings.Index(n.Data, result[0])
-			}
-
-			fmt.Println(position, strings.Index(n.Data, result[0]))
-
-			paste = append(paste, &Paste{
-				Attributes: attributes,
-				Component:  component,
-				Index:      position,
-				Name:       name,
-				Raw:        result[0],
-			})
-		}
-
-		lenght := len(n.Data)
-
-		for i, p := range paste {
-			fmt.Println(i, p.Index, p.Raw, p.Name, p.Attributes)
-
-			p.Index -= lenght - len(n.Data)
-			before := n.Data[:p.Index]
-			n.Data = n.Data[p.Index+len(p.Raw):]
-
-			n.Parent.InsertBefore(textNode(before), n)
-
-			if p.Component != nil {
-				f.pasteComponent(n, p.Component, p.Attributes)
-			}
-		}
+		styles[source.Path] = component.Style
+		f.pasteComponent(n, component, attributes)
 
 	}
-
-Skip:
+Next:
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		f.useComponents(c, imports, styles)
-	}
-
-	if delete {
 	}
 }

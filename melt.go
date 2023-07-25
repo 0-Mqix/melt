@@ -14,11 +14,10 @@ import (
 
 /*
  TODO:
-
-  - change the way of custom component parsing
-	<Bruh .Reasons="?" /> should become <melt-bruh .Reason="?"></melt-bruh> and then iterate over the tree to change should also work neetly with <slot/>
-  -  <slot />
+  -  <slot /> & component as argument
+  - proper style localization
   - make readme with documentation
+  - alteast 50% tested
 */
 
 type Component struct {

@@ -7,6 +7,8 @@ require (
 	golang.org/x/net v0.12.0
 )
 
+require github.com/yosssi/gohtml v0.0.0-20201013000340-ee4748c638f4 // indirect
+
 require (
 	github.com/cli/safeexec v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
