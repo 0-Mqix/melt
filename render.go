@@ -9,19 +9,24 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"unicode"
 
 	sass "github.com/bep/godartsass/v2"
+	"github.com/ericchiang/css"
 	formatter "github.com/yosssi/gohtml"
 	"golang.org/x/net/html"
 )
 
 var (
-	componentRegex         = regexp.MustCompile(`(?m)<(?P<name>[A-Z][a-zA-Z0-9-_]+)(?P<attributes>(?:[^>"]+|"[^"]*")*|)\/>`)
-	styleLastSelectorRegex = regexp.MustCompile(`(?m)([^{}]+)\s*(?:{)`)
-	TemplateFunctionRegex  = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}`)
+	componentRegex        = regexp.MustCompile(`(?m)<(?P<closing>[/-]?)(?P<name>[A-Z](?:[a-zA-Z0-9-_]?)+)(?P<attributes>(?:[^>"/]+|"[^"]*")*|)(?P<self_closing>/?)>`)
+	styleSelectorRegex    = regexp.MustCompile(`(?m)(?s)([^{}]+)\s*({.+?})`)
+	TemplateFunctionRegex = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}(\n?)`)
+	CommentRegex          = regexp.MustCompile(`(?m)<!--(.*?)-->`)
 
 	encoder = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz123456").WithPadding(base32.NoPadding)
 )
+
+const MELT_INTERNAL_GLOBAL_PREFIX = "#MELT-INTERNAL-GLOBAL"
 
 type Import struct {
 	Name string
@@ -43,30 +48,25 @@ func applyStyleId(n *html.Node, styleId string, selectors map[string]bool) {
 	}
 }
 
-func getImports(n *html.Node) ([]*Import, bool) {
-	result := make([]*Import, 0)
-
-	if n.Type == html.ElementNode && n.Data == "imports" {
-
-		for _, line := range strings.Split(n.FirstChild.Data, "\n") {
-			line = strings.TrimSpace(line)
-			data := strings.Split(line, " ")
-
-			if len(data) < 2 {
-				continue
-			}
-
-			result = append(result, &Import{
-				Name: data[0],
-				Path: data[1],
-			})
-		}
+func getImport(n *html.Node) (*Import, bool) {
+	if n.FirstChild == nil || n.FirstChild.Type != html.TextNode {
+		return nil, false
 	}
 
-	return result, false
+	line := strings.TrimSpace(n.FirstChild.Data)
+	data := strings.Split(line, " ")
+
+	if len(data) < 2 {
+		return nil, false
+	}
+
+	return &Import{
+		Name: data[0],
+		Path: strings.ToLower(data[1]),
+	}, true
 }
 
-func extractFromFakeBody(n *html.Node, result *[]*html.Node) {
+func extractFromBody(n *html.Node, result *[]*html.Node) {
 	if n.Type == html.ElementNode && n.Data == "body" {
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			*result = append(*result, c)
@@ -75,12 +75,12 @@ func extractFromFakeBody(n *html.Node, result *[]*html.Node) {
 	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		extractFromFakeBody(c, result)
+		extractFromBody(c, result)
 	}
 }
 
-func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
-	raw, err := io.ReadAll(file)
+func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component, error) {
+	raw, err := io.ReadAll(reader)
 
 	if err != nil {
 		return nil, err
@@ -88,22 +88,88 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 
 	/// STEP: CHANGE COMPONENT CALLS
 	var usedComponents []string
+
 	raw = componentRegex.ReplaceAllFunc(raw, func(b []byte) []byte {
 		data := componentRegex.FindStringSubmatch(string(b))
 
-		name := encoder.EncodeToString([]byte(data[1]))
-		attributes := encoder.EncodeToString([]byte(data[2]))
+		if data[2] == "Slot" {
+			return []byte("[[ .Childeren ]]")
+		}
 
-		replacement := fmt.Sprint("<melt-" + name + "-" + attributes + "></melt-" + name + "-" + attributes + ">")
-		usedComponents = append(usedComponents, "<melt-"+name+"-"+attributes+">", "</melt-"+name+"-"+attributes+">")
+		var childeren string
+		var attributes string
+
+		for _, a := range SplitIgnoreString(data[3], ' ') {
+			if strings.Index(a, "-") != 0 {
+				attributes += a + " "
+				continue
+			}
+
+			split := SplitIgnoreString(a, '=')
+
+			if len(split) < 2 {
+				continue
+			}
+
+			name := encoder.EncodeToString([]byte(split[0][1:]))
+
+			tagName := fmt.Sprintf("melt-partial-%s", name)
+			startTag := fmt.Sprintf("<%s>", tagName)
+			closingTag := fmt.Sprintf("</%s>", tagName)
+
+			raw := strings.TrimFunc(split[1], func(r rune) bool {
+				if r == '"' || r == '\'' {
+					return true
+				}
+
+				return false
+			})
+
+			childeren += startTag + raw + closingTag
+			usedComponents = append(usedComponents, startTag, closingTag)
+		}
+
+		name := encoder.EncodeToString([]byte(data[2]))
+		attributes = encoder.EncodeToString([]byte(attributes))
+
+		if data[1] == "-" {
+			return []byte(fmt.Sprintf("[[ partial_component .Partials `%s` ]]", data[2]))
+		}
+
+		closing := data[1] == "/"
+		selfClosing := data[4] == "/"
+
+		var replacement string
+
+		tagName := fmt.Sprintf("melt-%s", name)
+		startTag := fmt.Sprintf("<%s melt-attributes=\"%s\">", tagName, attributes)
+		closingTag := fmt.Sprintf("</%s>", tagName)
+
+		if !closing && !selfClosing {
+			replacement = startTag + childeren
+			usedComponents = append(usedComponents, startTag)
+		} else if closing {
+			replacement = closingTag
+			usedComponents = append(usedComponents, closingTag)
+		} else if selfClosing {
+			replacement = startTag + childeren + closingTag
+			usedComponents = append(usedComponents, startTag, closingTag)
+		}
 
 		return []byte(replacement)
 	})
 
-	/// STEP: HIDE TEMPLATING
+	/// STEP: HIDE TEMPLATING AND PREFIX VARIABLES
 	raw = TemplateFunctionRegex.ReplaceAllFunc(raw, func(b []byte) []byte {
-		value := hex.EncodeToString(b[2 : len(b)-2])
-		return []byte("{{" + value + "}}")
+		result := TemplateFunctionRegex.FindSubmatch(b)
+
+		prefix := fmt.Sprintf("$%s_", name)
+		value := string(result[1])
+		value = prefixTemplateVariables(value, "$", prefix)
+		value = prefixTemplateVariables(value, ".", "$root")
+
+		replacement := []byte("{{" + hex.EncodeToString([]byte(value)) + "}}")
+		return append(replacement, result[2]...)
 	})
 
 	// STEP: PARSE
@@ -116,7 +182,7 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 	style := ""
 	imports := make(map[string]*Import)
 
-	extractFromFakeBody(document, &nodes)
+	extractFromBody(document, &nodes)
 	var melted []*html.Node
 
 	for _, n := range nodes {
@@ -126,10 +192,10 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 		}
 
 		switch n.Data {
-		case "imports":
-			result, _ := getImports(n)
-			for _, i := range result {
-				imports[i.Name] = i
+		case "import":
+			result, ok := getImport(n)
+			if ok {
+				imports[result.Name] = result
 			}
 
 		case "style":
@@ -150,6 +216,21 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 	}
 
 	document, _ = html.Parse(meltedBuffer)
+
+	//STEP: PREPARE CSS FOR % GLOBAL
+	style = styleSelectorRegex.ReplaceAllStringFunc(style, func(s string) string {
+		result := styleSelectorRegex.FindStringSubmatch(s)
+
+		selector := strings.TrimLeftFunc(result[1], func(r rune) bool {
+			return unicode.IsSpace(r)
+		})
+
+		if selector[0] == '%' {
+			selector = MELT_INTERNAL_GLOBAL_PREFIX + selector[1:]
+		}
+
+		return selector + result[2]
+	})
 
 	// STEP: TRANSPILE SCSS WITH DART SASS
 	transpiler, err := sass.Start(sass.Options{LogEventHandler: func(e sass.LogEvent) {
@@ -175,26 +256,91 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 
 	//STEP: LOCALIZE CSS
 	styleId := "melt-" + name
-	selectors := make(map[string]bool)
+	selectors := make(map[string]string)
 
-	style = styleLastSelectorRegex.ReplaceAllStringFunc(styleResult.CSS, func(s string) string {
-		selector := s[:len(s)-1]
-		selectors[selector] = true
+	foundStyles := styleSelectorRegex.FindAllStringSubmatch(styleResult.CSS, -1)
 
-		return selector + "." + styleId + "{"
-	})
+	for _, style := range foundStyles {
+		if len(style) != 3 {
+			continue
+		}
 
-	fmt.Println(selectors)
+		selectors[style[1]] = style[2]
+	}
 
-	// applyStyleId(document, styleId, selectors)
+	style = ""
+	for name, rules := range selectors {
+		selector, err := css.Parse(name)
+
+		if err != nil {
+			fmt.Println("[MELT] [CSS]", err)
+			continue
+		}
+
+		results := selector.Select(document)
+
+		name, found := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
+
+		if found {
+			style += name + rules
+			continue
+		}
+
+		if len(results) == 0 {
+			continue
+		}
+
+		style += name + "." + styleId + rules
+
+		for _, n := range results {
+			replacement := html.Attribute{
+				Key: "class",
+				Val: styleId,
+			}
+
+			var index int
+			var class *html.Attribute
+
+			for i, a := range n.Attr {
+
+				if a.Key != "class" {
+					continue
+				}
+
+				index = i
+				class = &a
+				break
+			}
+
+			if class != nil {
+				replacement.Val = class.Val + " " + styleId
+				n.Attr[index] = replacement
+			} else {
+				n.Attr = append(n.Attr, replacement)
+			}
+		}
+	}
+
+	//STEP: CREATE RESULT
+	component := &Component{
+		Name:     name,
+		Path:     path,
+		Template: template.New(name).Funcs(Functions),
+	}
 
 	//STEP: USE COMPONENTS
 	styles := make(map[string]string)
-	f.useComponents(document, imports, styles)
+	f.useComponents(document, component, imports, styles)
+
+	for _, s := range styles {
+		style += s
+	}
+
+	component.Style = style
 
 	//STEP: CLEAN HTML
 	nodes = nil
-	extractFromFakeBody(document, &nodes)
+	extractFromBody(document, &nodes)
 
 	templateBuffer := bytes.NewBufferString("")
 
@@ -208,35 +354,34 @@ func (f *Furnace) Render(name string, file io.Reader) (*Component, error) {
 		templateString = strings.ReplaceAll(templateString, component, "")
 	}
 
-	// STEP: CREATE RESULT
-	for _, s := range styles {
-		style += s
-	}
+	//STEP: ADD PARTIALS TEMPLATE TO COMPONENT
+	component.partialsTemplate = templateString
 
-	result := &Component{
-		Style:    style,
-		Template: template.New(name),
-	}
-
-	// STEP: EXTRACT NODES
-	templateBuffer = bytes.NewBufferString(templateString)
-	document, _ = html.Parse(templateBuffer)
-	extractFromFakeBody(document, &result.Nodes)
-
-	/// STEP: RENDER TEMPLATE FUNCTIONS
+	// STEP: RENDER TEMPLATE FUNCTIONS
 	templateString = TemplateFunctionRegex.ReplaceAllStringFunc(templateString, func(s string) string {
-		value, _ := hex.DecodeString(s[2 : len(s)-2])
-		return "{{" + string(value) + "}}"
+		result := TemplateFunctionRegex.FindStringSubmatch(s)
+		value, _ := hex.DecodeString(result[1])
+		return "{{" + string(value) + "}}" + result[2]
 	})
 
 	// STEP: FORMAT HTML
 	formatter.Condense = true
 	templateString = formatter.Format(templateString)
 
+	// STEP: COMMENT WORK AROUND
+	templateString = CommentRegex.ReplaceAllStringFunc(templateString, func(s string) string {
+		content := CommentRegex.FindStringSubmatch(s)
+		return fmt.Sprintf("{{comment \"%s\" }}", content[1])
+	})
+
+	templateString = "{{ $root := . }}\n" + templateString
+
 	// STEP: PARSE TEMPLATE FINALY
-	result.Template.Parse(templateString)
+	component.Template.Parse(templateString)
 
-	fmt.Println(templateString)
+	if f.PrintRenderOutput {
+		fmt.Printf("*** template: %s ***\n%s\n*** end template ***\n", name, templateString)
+	}
 
-	return result, nil
+	return component, nil
 }

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	text "text/template"
+	"unicode"
 
 	"golang.org/x/net/html"
 )
@@ -19,6 +21,12 @@ func SplitIgnoreString(s string, sep rune) []string {
 		if c == '"' {
 			in = !in
 			part += string(c)
+			continue
+		}
+
+		if !in && sep == ' ' && unicode.IsSpace(c) {
+			result = append(result, part)
+			part = ""
 			continue
 		}
 
@@ -46,13 +54,18 @@ const (
 	ArgumentTypeConstant
 )
 
-func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes string) {
+func (f *Furnace) pasteComponent(
+	n *html.Node,
+	component *Component,
+	attributes []string,
+	partials map[string]string,
+) {
 	buffer := bytes.NewBufferString("")
 	declarations := ""
 
 	arguments := make(map[string]Argument)
 
-	for _, attribute := range SplitIgnoreString(attributes, ' ') {
+	for _, attribute := range attributes {
 		attribute = strings.TrimSpace(attribute)
 
 		if len(attribute) == 0 {
@@ -71,9 +84,13 @@ func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes 
 
 		case '.', '$':
 
-			if !(value[0] == '.' || value[1] == '$') {
-				value = strings.Trim(value, "\"")
+			//prefix so variable localization works
+			prefix := fmt.Sprintf("$%s_", component.Name)
+			name = prefixTemplateVariables(string(name), "$", prefix)
+			name = prefixTemplateVariables(name, ".", "$root")
 
+			if !(value[0] == '.' || value[0] == '$') {
+				value = strings.Trim(value, "\"")
 				value = TemplateFunctionRegex.ReplaceAllStringFunc(value, func(s string) string {
 					return "{{" + hex.EncodeToString([]byte(s[2:len(s)-2])) + "}}"
 				})
@@ -86,31 +103,26 @@ func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes 
 			argument := fmt.Sprintf("$arg%d", id)
 			arguments[name] = Argument{Value: argument, Type: ArgumentTypeVariable}
 
-			declaration := fmt.Sprintf("%s := %s", argument, value)
+			declaration := fmt.Sprintf("- %s := %s", argument, value)
 			encoded := hex.EncodeToString([]byte(declaration))
 			declarations += fmt.Sprintf("{{%s}}", encoded)
 
 			f.lastArgumentId.Add(1)
 
-		case '&':
-			// fmt.Println(name, value)
 		}
 
 	}
 
-	for _, part := range component.Nodes {
-		html.Render(buffer, part)
-	}
+	argumented := TemplateFunctionRegex.ReplaceAllStringFunc(component.partialsTemplate, func(s string) string {
+		result := TemplateFunctionRegex.FindStringSubmatch(s)
 
-	argumented := TemplateFunctionRegex.ReplaceAllStringFunc(buffer.String(), func(s string) string {
-		b, _ := hex.DecodeString(s[2 : len(s)-2])
+		b, _ := hex.DecodeString(result[1])
 
 		content := strings.TrimSpace(string(b))
 
 		argument, ok := arguments[content]
 
 		if ok && argument.Type == ArgumentTypeConstant {
-			fmt.Println("argument", content, argument.Value)
 			return argument.Value
 		}
 
@@ -120,12 +132,14 @@ func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes 
 		return "{{" + content + "}}"
 	})
 
-	//prepend the declarations to the arugmented component html
-	buffer = bytes.NewBufferString(declarations + argumented)
+	partialized := f.pastePartials(component.Name, argumented, partials)
+
+	//prepend the declarations to the arugmented and the pasted partialized component html
+	buffer = bytes.NewBufferString(declarations + partialized)
 
 	nodes := make([]*html.Node, 0)
 	element, _ := html.Parse(buffer)
-	extractFromFakeBody(element, &nodes)
+	extractFromBody(element, &nodes)
 
 	for _, part := range nodes {
 		part.Parent.RemoveChild(part)
@@ -133,99 +147,142 @@ func (f *Furnace) pasteComponent(n *html.Node, component *Component, attributes 
 	}
 }
 
-func replaceTemplateVariables(s string, arguments map[string]Argument) string {
-Start:
-	begin := 0
-	selecting := false
-	last := rune(0)
-
-	for i, c := range s {
-		if !selecting && (c == '.' || c == '$') {
-
-			if i > 0 && !(last == ' ' || last == ',') {
-				goto Continue
-			}
-
-			selecting = true
-			begin = i
-		}
-
-		if !selecting {
-			goto Continue
-		}
-
-		if len(s)-1 == i {
-			name := s[begin:]
-			replacement, ok := arguments[name]
-			if !ok {
-				goto Continue
-			}
-			return s[:begin] + replacement.Value
-
-		} else {
-			end := i
-			next := s[i+1]
-
-			if next == '.' || next == ',' || next == ' ' {
-				selecting = false
-				name := s[begin : end+1]
-				replacement, ok := arguments[name]
-
-				if !ok {
-					goto Continue
-				}
-
-				if end-begin-1 == len(s) {
-					return replacement.Value
-				}
-
-				s = s[:begin] + replacement.Value + s[end+1:]
-				goto Start
-			}
-		}
-
-	Continue:
-		last = c
-	}
-
-	return s
-}
-
-func textNode(data string) *html.Node {
-	return &html.Node{Type: html.TextNode, Data: data}
-}
-
-func (f *Furnace) useComponents(n *html.Node, imports map[string]*Import, styles map[string]string) {
+func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[string]*Import, styles map[string]string) {
 	if n.Type == html.ElementNode && strings.Index(n.Data, "melt-") == 0 {
 
 		data := strings.Split(n.Data, "-")
 
+		if data[1] == "slot" || data[1] == "partial" {
+			goto Next
+		}
+
 		result, _ := encoder.DecodeString(data[1])
 		name := string(result)
 
-		result, _ = encoder.DecodeString(data[2])
-		attributes := string(result)
+		result, _ = encoder.DecodeString(n.Attr[0].Val)
+		attributes := SplitIgnoreString(string(result), ' ')
+
+		childeren := bytes.NewBufferString("")
+		partials := make(map[string]string)
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && strings.Index(c.Data, "melt-") == 0 {
+
+				data := strings.Split(c.Data, "-")
+
+				if data[1] != "partial" {
+					html.Render(childeren, c)
+					defer n.RemoveChild(c)
+					continue
+				}
+
+				result, _ := encoder.DecodeString(data[2])
+				name := string(result)
+
+				partial := bytes.NewBufferString("")
+
+				for pc := c.FirstChild; pc != nil; pc = pc.NextSibling {
+					html.Render(partial, pc)
+					defer c.RemoveChild(pc)
+				}
+
+				partials[name] = partial.String()
+
+			} else {
+				html.Render(childeren, c)
+				defer n.RemoveChild(c)
+			}
+		}
+
+		partials["Slot"] = childeren.String()
 
 		source, ok := imports[name]
-
-		var component *Component
 
 		if !ok {
 			goto Next
 		}
 
-		component, ok = f.GetComponent(source.Path)
+		component, ok := f.GetComponent(source.Path, false)
 
 		if !ok {
 			goto Next
 		}
 
 		styles[source.Path] = component.Style
-		f.pasteComponent(n, component, attributes)
+		f.AddDependency(source.Path, self.Path)
+
+		if f.ComponentComments {
+			n.AppendChild(&html.Node{
+				Type:      html.CommentNode,
+				Data:      fmt.Sprintf(" + %s: %s ", name, source.Path),
+				Namespace: n.Namespace,
+			})
+		}
+
+		f.pasteComponent(n, component, attributes, partials)
+
+		if f.ComponentComments {
+			n.AppendChild(&html.Node{
+				Type:      html.CommentNode,
+				Data:      fmt.Sprintf(" - %s ", name),
+				Namespace: n.Namespace,
+			})
+		}
 
 	}
 Next:
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		f.useComponents(c, imports, styles)
+		f.useComponents(c, self, imports, styles)
 	}
+}
+
+func (f *Furnace) pastePartials(name, raw string, partials map[string]string) string {
+	template := text.New(name).
+		Delims("[[", "]]").
+		Funcs(text.FuncMap{
+			"partial_component": func(partials map[string]string, name string) string {
+				return partials[name]
+			},
+		})
+
+	// STEP: MAKE COMPONENT PARTIALS TEMPLATE
+	template.Parse(raw)
+
+	var data struct {
+		Childeren string
+		Partials  map[string]string
+	}
+
+	for n, s := range partials {
+		s = TemplateFunctionRegex.ReplaceAllStringFunc(s, func(s string) string {
+
+			result := TemplateFunctionRegex.FindStringSubmatch(s)
+			raw, _ := hex.DecodeString(result[1])
+
+			value := string(raw)
+			prefix := fmt.Sprintf("$%s_", name)
+			value = prefixTemplateVariables(value, "%", prefix)
+
+			return "{{" + hex.EncodeToString([]byte(value)) + "}}" + result[2]
+		})
+
+		if f.ComponentComments {
+			s = fmt.Sprintf("<!-- + %s -->\n%s<!-- - %s -->\n", n, s, n)
+		}
+
+		partials[n] = s
+	}
+
+	data.Childeren = partials["Slot"]
+	delete(partials, "Slot")
+	data.Partials = partials
+
+	result := bytes.NewBufferString("")
+	err := template.Execute(result, data)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return result.String()
 }

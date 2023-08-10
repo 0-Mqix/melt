@@ -94,3 +94,97 @@ func TestReplaceTemplateVariables(t *testing.T) {
 		}
 	}
 }
+
+func TestPrefixTemplateVariables(t *testing.T) {
+
+	type Case struct {
+		Input    string
+		Expected string
+		Target   string
+		Prefix   string
+	}
+
+	tests := []Case{
+		{
+			Input:    ".Foo",
+			Expected: "$root.Foo",
+			Target:   ".",
+			Prefix:   "$root",
+		},
+		{
+			Input:    ".",
+			Expected: "$root",
+			Target:   ".",
+			Prefix:   "$root",
+		},
+		{
+			Input:    "$bar",
+			Expected: "$Index_bar",
+			Target:   "$",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "{{ range $x $y := .Coordinates }}",
+			Expected: "{{ range $Index_x $Index_y := .Coordinates }}",
+			Target:   "$",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "{{ range $x $y $z := .Coordinates }}",
+			Expected: "{{ range $Index_x $Index_y $Index_z := .Coordinates }}",
+			Target:   "$",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "{{ range $x $y $z := .Coordinates }}",
+			Expected: "{{ range $x $y $z := $root.Coordinates }}",
+			Target:   ".",
+			Prefix:   "$root",
+		},
+		{
+			Input:    "{{ %test }}",
+			Expected: "{{ $Index_test }}",
+			Target:   "%",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "{{ %test }}",
+			Expected: "{{ $Index_test }}",
+			Target:   "%",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "%x",
+			Expected: "$Index_x",
+			Target:   "%",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "%x",
+			Expected: "$Index_x",
+			Target:   "%",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "{{ %x }}",
+			Expected: "{{ $Index_x }}",
+			Target:   "%",
+			Prefix:   "$Index_",
+		},
+		{
+			Input:    "{{ %test %x %y }}",
+			Expected: "{{ $Index_test $Index_x $Index_y }}",
+			Target:   "%",
+			Prefix:   "$Index_",
+		},
+	}
+
+	for _, c := range tests {
+
+		result := prefixTemplateVariables(c.Input, c.Target, c.Prefix)
+
+		if c.Expected != result {
+			t.Fatalf("failed case:\n Input:\t\t%s\n Expected:\t%s\n Output:\t%s\n", c.Input, c.Expected, result)
+		}
+	}
+}

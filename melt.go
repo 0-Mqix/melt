@@ -1,104 +1,71 @@
 package melt
 
 import (
-	"bytes"
-	"fmt"
-	"html/template"
-	"os"
-	"strings"
+	"sync"
 	"sync/atomic"
-	"unicode"
-
-	"golang.org/x/net/html"
 )
 
 /*
- TODO:
-  -  <slot /> & component as argument
-  - proper style localization
+TODO:
   - make readme with documentation
-  - alteast 50% tested
+  - fix sass transpiler inside folder
 */
 
-type Component struct {
-	Template *template.Template
-	Style    string
-	Nodes    []*html.Node
-	Name     string
-}
-
 type Furnace struct {
-	Components       map[string]*Component
-	ComponentComment bool
-	lastArgumentId   atomic.Int64
+	ComponentComments bool
+	AutoReloadEvent   bool
+	ReloadEventUrl    string
+	PrintRenderOutput bool
+
+	Components map[string]*Component
+	Roots      map[string]*Root
+
+	reloadSubscribers map[string]chan bool
+	subscribersMutex  sync.Mutex
+
+	lastArgumentId atomic.Int64
+
+	dependencyOf map[string]map[string]bool
 }
 
-func New() *Furnace {
+type MeltOption func(*Furnace)
+
+func New(options ...MeltOption) *Furnace {
 	f := &Furnace{
-		Components:       make(map[string]*Component),
-		ComponentComment: true,
+		Components: make(map[string]*Component),
+		Roots:      make(map[string]*Root),
+
+		ComponentComments: true,
+		PrintRenderOutput: false,
+
+		reloadSubscribers: make(map[string]chan bool),
+		dependencyOf:      make(map[string]map[string]bool),
+	}
+
+	for _, option := range options {
+		option(f)
 	}
 
 	return f
 }
 
-func (f *Furnace) GetComponent(path string) (*Component, bool) {
-	component, ok := f.Components[path]
-
-	if ok {
-		return component, true
+func WithPrintRenderOutput(value bool) MeltOption {
+	return func(f *Furnace) {
+		f.PrintRenderOutput = value
 	}
-
-	raw, err := os.ReadFile(path)
-
-	if err != nil {
-		fmt.Println("[MELT]", err)
-		return nil, false
-	}
-
-	split := strings.Split(path, ".")
-
-	if len(split) < 2 {
-		fmt.Println("[MELT] invalid import path:", path)
-		return nil, false
-	}
-
-	component, err = f.Render(ComponentName(split[0]), bytes.NewBuffer(raw))
-
-	if err != nil {
-		fmt.Println("[MELT]", err)
-		return nil, false
-	}
-
-	f.AddComponent(path, component)
-
-	return component, true
 }
 
-func (f *Furnace) ComponentExists(path string) bool {
-	_, ok := f.Components[path]
-	return ok
+func WithComponentComments(value bool) MeltOption {
+	return func(f *Furnace) {
+		f.PrintRenderOutput = value
+	}
 }
 
-func (f *Furnace) AddComponent(path string, component *Component) {
-	if f.ComponentExists(path) {
-		fmt.Printf("[MELT] %s was already defined", path)
+func WithAutoReloadEvent(url string, paths ...string) MeltOption {
+	return func(f *Furnace) {
+		f.AutoReloadEvent = true
+		f.ReloadEventUrl = url
+
+		go f.StartWatcher(paths...)
 	}
-
-	f.Components[path] = component
-}
-
-func ComponentName(input string) string {
-	words := strings.FieldsFunc(input, func(r rune) bool {
-		return unicode.IsSpace(r) || r == '_' || r == '/'
-	})
-
-	transformed := make([]string, len(words))
-	for i, word := range words {
-		if len(word) > 0 {
-			transformed[i] = strings.ToUpper(string(word[0])) + word[1:]
-		}
-	}
-
-	return strings.Join(transformed, "")
 }
