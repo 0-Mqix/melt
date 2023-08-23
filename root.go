@@ -3,10 +3,13 @@ package melt
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	text "text/template"
 
 	"golang.org/x/net/html"
 )
@@ -14,27 +17,43 @@ import (
 const RELOAD_EVENT_SCRIPT = "new EventSource(\"%s\").onmessage = function (e) {if (e.data == \"reload\") {location.reload();} };"
 
 type Root struct {
-	Raw string
+	Template *template.Template `json:"-"`
+	String   string             `json:"template"`
+	Path     string             `json:"path"`
 }
 
-func (r *Root) Write(w http.ResponseWriter, component *Component, data any, style string) {
-	raw := bytes.NewBufferString("")
-	err := component.Template.Execute(raw, data)
+func (r *Root) Write(w http.ResponseWriter, component *Component, bodyData, rootData any) {
+	body := bytes.NewBufferString("")
+	err := component.Template.Execute(body, bodyData)
+
+	var data struct {
+		Body string
+		Data any
+	}
+
+	data.Body = body.String()
+	data.Data = rootData
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
 	}
 
-	fmt.Fprintf(w, r.Raw, style, raw)
+	r.Template.Execute(w, data)
 }
 
 func (f *Furnace) GetRoot(path string, force bool) (*Root, bool) {
 	path = strings.ToLower(path)
+	path = filepath.Clean(path)
+	path = filepath.ToSlash(path)
 
 	root, ok := f.Roots[path]
 
 	if ok && !force {
 		return root, true
+	}
+
+	if f.productionMode {
+		return root, ok
 	}
 
 	raw, err := os.ReadFile(path)
@@ -44,14 +63,7 @@ func (f *Furnace) GetRoot(path string, force bool) (*Root, bool) {
 		return nil, false
 	}
 
-	_, ok = strings.CutSuffix(path, ".html")
-
-	if !ok {
-		fmt.Println("[MELT] invalid import path:", path)
-		return nil, false
-	}
-
-	root, err = f.createRoot(bytes.NewBuffer(raw))
+	root, err = f.createRoot(path, bytes.NewBuffer(raw), f.AutoReloadEvent)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
@@ -67,6 +79,8 @@ func (f *Furnace) GetRoot(path string, force bool) (*Root, bool) {
 	} else {
 		f.AddRoot(path, root)
 	}
+
+	f.Output()
 
 	return root, true
 }
@@ -105,7 +119,7 @@ func appendReloadEventScript(n *html.Node, url string) {
 	}
 }
 
-func (f *Furnace) createRoot(reader io.Reader) (*Root, error) {
+func (f *Furnace) createRoot(path string, reader io.Reader, withReloadEvents bool) (*Root, error) {
 	document, err := html.Parse(reader)
 
 	if err != nil {
@@ -114,11 +128,24 @@ func (f *Furnace) createRoot(reader io.Reader) (*Root, error) {
 
 	buffer := bytes.NewBufferString("")
 
-	if f.AutoReloadEvent {
-		appendReloadEventScript(document, f.ReloadEventUrl)
+	if withReloadEvents {
+		appendReloadEventScript(document, f.AutoReloadEventUrl)
 	}
 
 	html.Render(buffer, document)
+	raw := buffer.String()
 
-	return &Root{Raw: buffer.String()}, nil
+	template := template.New(path).Funcs(text.FuncMap{
+		"html": func(raw string) template.HTML {
+			return template.HTML(raw)
+		},
+	})
+
+	template, err = template.Parse(raw)
+
+	if err != nil {
+		fmt.Println("[MELT] error with creating root at path:", path)
+	}
+
+	return &Root{Template: template, String: raw, Path: path}, nil
 }

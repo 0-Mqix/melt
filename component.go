@@ -6,12 +6,19 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"unicode"
 )
 
 func (f *Furnace) AddDependency(path, to string) {
+
+	if f.productionMode {
+		fmt.Println("[MELT] dependencies are not supported in production mode")
+		return
+	}
+
 	m, ok := f.dependencyOf[path]
 
 	if !ok {
@@ -23,20 +30,29 @@ func (f *Furnace) AddDependency(path, to string) {
 }
 
 type Component struct {
-	Template *template.Template
-	Style    string
-	Name     string
-	Path     string
+	Template *template.Template `json:"-"`
+	String   string             `json:"template"`
 
-	partialsTemplate string
+	Style string `json:"style"`
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+
+	partialsTemplate string `json:"-"`
 }
 
 func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 	path = strings.ToLower(path)
+	path = filepath.Clean(path)
+	path = filepath.ToSlash(path)
+
 	component, ok := f.Components[path]
 
 	if ok && !force {
 		return component, true
+	}
+
+	if f.productionMode {
+		return component, ok
 	}
 
 	raw, err := os.ReadFile(path)
@@ -46,13 +62,7 @@ func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 		return nil, false
 	}
 
-	name, ok := strings.CutSuffix(path, ".html")
-
-	if !ok {
-		fmt.Println("[MELT] invalid import path:", path)
-		return nil, false
-	}
-
+	name, _ := strings.CutSuffix(path, filepath.Ext(path))
 	component, err = f.Render(ComponentName(name), bytes.NewBuffer(raw), path)
 
 	if err != nil {
@@ -69,6 +79,8 @@ func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 	} else {
 		f.AddComponent(path, component)
 	}
+
+	f.Output()
 
 	return component, true
 }
@@ -91,8 +103,10 @@ func (f *Furnace) AddComponent(path string, component *Component) {
 }
 
 func ComponentName(input string) string {
+	input = filepath.Base(input)
+
 	words := strings.FieldsFunc(input, func(r rune) bool {
-		return unicode.IsSpace(r) || r == '_' || r == '/'
+		return unicode.IsSpace(r) || r == '_' || r == '-'
 	})
 
 	transformed := make([]string, len(words))
@@ -106,12 +120,17 @@ func ComponentName(input string) string {
 }
 
 func (c *Component) Write(w http.ResponseWriter, data any) {
-	buffer := bytes.NewBufferString("")
-	err := c.Template.Execute(buffer, data)
+	err := c.Template.Execute(w, data)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
 	}
+}
 
-	buffer.WriteTo(w)
+func (c *Component) WriteTemplate(w http.ResponseWriter, name string, data any) {
+	err := c.Template.ExecuteTemplate(w, name, data)
+
+	if err != nil {
+		fmt.Println("[MELT]", err)
+	}
 }

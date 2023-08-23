@@ -147,7 +147,7 @@ func (f *Furnace) pasteComponent(
 	}
 }
 
-func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[string]*Import, styles map[string]string) {
+func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[string]*componentImport) {
 	if n.Type == html.ElementNode && strings.Index(n.Data, "melt-") == 0 {
 
 		data := strings.Split(n.Data, "-")
@@ -203,13 +203,11 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 		}
 
 		component, ok := f.GetComponent(source.Path, false)
+		f.AddDependency(source.Path, self.Path)
 
 		if !ok {
 			goto Next
 		}
-
-		styles[source.Path] = component.Style
-		f.AddDependency(source.Path, self.Path)
 
 		if f.ComponentComments {
 			n.AppendChild(&html.Node{
@@ -228,11 +226,10 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 				Namespace: n.Namespace,
 			})
 		}
-
 	}
 Next:
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		f.useComponents(c, self, imports, styles)
+		f.useComponents(c, self, imports)
 	}
 }
 

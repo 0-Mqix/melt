@@ -9,10 +9,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
-	"unicode"
 
-	sass "github.com/bep/godartsass/v2"
-	"github.com/ericchiang/css"
 	formatter "github.com/yosssi/gohtml"
 	"golang.org/x/net/html"
 )
@@ -22,13 +19,14 @@ var (
 	styleSelectorRegex    = regexp.MustCompile(`(?m)(?s)([^{}]+)\s*({.+?})`)
 	TemplateFunctionRegex = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}(\n?)`)
 	CommentRegex          = regexp.MustCompile(`(?m)<!--(.*?)-->`)
+	ImportRegex           = regexp.MustCompile(`(?m)(?s)(<import>)(.+?) (.+?)(<\/import>)`)
 
 	encoder = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz123456").WithPadding(base32.NoPadding)
 )
 
 const MELT_INTERNAL_GLOBAL_PREFIX = "#MELT-INTERNAL-GLOBAL"
 
-type Import struct {
+type componentImport struct {
 	Name string
 	Path string
 }
@@ -48,7 +46,7 @@ func applyStyleId(n *html.Node, styleId string, selectors map[string]bool) {
 	}
 }
 
-func getImport(n *html.Node) (*Import, bool) {
+func getImport(n *html.Node) (*componentImport, bool) {
 	if n.FirstChild == nil || n.FirstChild.Type != html.TextNode {
 		return nil, false
 	}
@@ -60,7 +58,7 @@ func getImport(n *html.Node) (*Import, bool) {
 		return nil, false
 	}
 
-	return &Import{
+	return &componentImport{
 		Name: data[0],
 		Path: strings.ToLower(data[1]),
 	}, true
@@ -80,6 +78,11 @@ func extractFromBody(n *html.Node, result *[]*html.Node) {
 }
 
 func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component, error) {
+
+	if f.productionMode {
+		return nil, fmt.Errorf("[MELT] rendering is currently not suported in production mode")
+	}
+
 	raw, err := io.ReadAll(reader)
 
 	if err != nil {
@@ -166,7 +169,6 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		prefix := fmt.Sprintf("$%s_", name)
 		value := string(result[1])
 		value = prefixTemplateVariables(value, "$", prefix)
-		value = prefixTemplateVariables(value, ".", "$root")
 
 		replacement := []byte("{{" + hex.EncodeToString([]byte(value)) + "}}")
 		return append(replacement, result[2]...)
@@ -180,7 +182,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	var nodes []*html.Node
 
 	style := ""
-	imports := make(map[string]*Import)
+	imports := make(map[string]*componentImport)
 
 	extractFromBody(document, &nodes)
 	var melted []*html.Node
@@ -201,6 +203,10 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		case "style":
 			result, ok := getStyle(n)
 			if ok {
+				if !f.SCSS {
+					fmt.Println("[MELT] [SCSS] is not enabled")
+					break
+				}
 				style += result
 			}
 
@@ -217,126 +223,20 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 	document, _ = html.Parse(meltedBuffer)
 
-	//STEP: PREPARE CSS FOR % GLOBAL
-	style = styleSelectorRegex.ReplaceAllStringFunc(style, func(s string) string {
-		result := styleSelectorRegex.FindStringSubmatch(s)
-
-		selector := strings.TrimLeftFunc(result[1], func(r rune) bool {
-			return unicode.IsSpace(r)
-		})
-
-		if selector[0] == '%' {
-			selector = MELT_INTERNAL_GLOBAL_PREFIX + selector[1:]
-		}
-
-		return selector + result[2]
-	})
-
-	// STEP: TRANSPILE SCSS WITH DART SASS
-	transpiler, err := sass.Start(sass.Options{LogEventHandler: func(e sass.LogEvent) {
-		fmt.Printf("[MELT] [SCSS] %v\n", e)
-	}})
-
-	if err != nil {
-		fmt.Printf("[MELT] [SCSS] %v\n", err)
-		return nil, err
-	}
-
-	styleResult, err := transpiler.Execute(sass.Args{
-		Source:       style,
-		SourceSyntax: sass.SourceSyntaxSCSS,
-		OutputStyle:  sass.OutputStyleCompressed,
-	})
-
-	if err != nil {
-		panic(err)
-	}
-
-	transpiler.Close()
-
-	//STEP: LOCALIZE CSS
-	styleId := "melt-" + name
-	selectors := make(map[string]string)
-
-	foundStyles := styleSelectorRegex.FindAllStringSubmatch(styleResult.CSS, -1)
-
-	for _, style := range foundStyles {
-		if len(style) != 3 {
-			continue
-		}
-
-		selectors[style[1]] = style[2]
-	}
-
-	style = ""
-	for name, rules := range selectors {
-		selector, err := css.Parse(name)
-
-		if err != nil {
-			fmt.Println("[MELT] [CSS]", err)
-			continue
-		}
-
-		results := selector.Select(document)
-
-		name, found := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
-
-		if found {
-			style += name + rules
-			continue
-		}
-
-		if len(results) == 0 {
-			continue
-		}
-
-		style += name + "." + styleId + rules
-
-		for _, n := range results {
-			replacement := html.Attribute{
-				Key: "class",
-				Val: styleId,
-			}
-
-			var index int
-			var class *html.Attribute
-
-			for i, a := range n.Attr {
-
-				if a.Key != "class" {
-					continue
-				}
-
-				index = i
-				class = &a
-				break
-			}
-
-			if class != nil {
-				replacement.Val = class.Val + " " + styleId
-				n.Attr[index] = replacement
-			} else {
-				n.Attr = append(n.Attr, replacement)
-			}
-		}
+	if f.SCSS {
+		style, _ = scss(name, style, document)
 	}
 
 	//STEP: CREATE RESULT
 	component := &Component{
 		Name:     name,
 		Path:     path,
+		Style:    style,
 		Template: template.New(name).Funcs(Functions),
 	}
 
 	//STEP: USE COMPONENTS
-	styles := make(map[string]string)
-	f.useComponents(document, component, imports, styles)
-
-	for _, s := range styles {
-		style += s
-	}
-
-	component.Style = style
+	f.useComponents(document, component, imports)
 
 	//STEP: CLEAN HTML
 	nodes = nil
@@ -374,7 +274,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		return fmt.Sprintf("{{comment \"%s\" }}", content[1])
 	})
 
-	templateString = "{{ $root := . }}\n" + templateString
+	component.String = templateString
 
 	// STEP: PARSE TEMPLATE FINALY
 	component.Template.Parse(templateString)
