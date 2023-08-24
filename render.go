@@ -16,15 +16,12 @@ import (
 
 var (
 	componentRegex        = regexp.MustCompile(`(?m)<(?P<closing>[/-]?)(?P<name>[A-Z](?:[a-zA-Z0-9-_]?)+)(?P<attributes>(?:[^>"/]+|"[^"]*")*|)(?P<self_closing>/?)>`)
-	styleSelectorRegex    = regexp.MustCompile(`(?m)(?s)([^{}]+)\s*({.+?})`)
 	TemplateFunctionRegex = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}(\n?)`)
 	CommentRegex          = regexp.MustCompile(`(?m)<!--(.*?)-->`)
 	ImportRegex           = regexp.MustCompile(`(?m)(?s)(<import>)(.+?) (.+?)(<\/import>)`)
 
 	encoder = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz123456").WithPadding(base32.NoPadding)
 )
-
-const MELT_INTERNAL_GLOBAL_PREFIX = "#MELT-INTERNAL-GLOBAL"
 
 type componentImport struct {
 	Name string
@@ -223,8 +220,10 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 	document, _ = html.Parse(meltedBuffer)
 
+	var scoped []string
+
 	if f.SCSS {
-		style, _ = scss(name, style, document)
+		style, scoped, _ = scss(name, style, document)
 	}
 
 	//STEP: CREATE RESULT
@@ -237,6 +236,10 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 	//STEP: USE COMPONENTS
 	f.useComponents(document, component, imports)
+
+	if f.SCSS {
+		addScopedMeltSelectors(name, scoped, document)
+	}
 
 	//STEP: CLEAN HTML
 	nodes = nil

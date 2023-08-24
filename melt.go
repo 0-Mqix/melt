@@ -12,8 +12,7 @@ import (
 
 /*
 TODO:
-  - fix sass localization %s scoped &  %g global and % get placed infront of all other styles
-  - tailwind stand alone cli suport
+  - custom scss prefix
   - make readme with documentation
 */
 
@@ -24,7 +23,6 @@ type Furnace struct {
 	PrintRenderOutput  bool   //prints out the template after a render
 	AutoUpdateImports  bool   //update all imports with the renamed path only works with the watcher
 	SCSS               bool   //scss in <style> -> dart sass -> localize the styles to the component
-	Tailwind           bool   //tailwind css support via tailwind standalone cli
 	StyleOutputFile    string //if not empty melt will write all the styles to this file
 	OutputFile         string //if not empty melt will write a output file that is used to use your components in production
 
@@ -139,12 +137,6 @@ func WithSCSS(value bool) meltOption {
 	}
 }
 
-func WithTailwind(value bool) meltOption {
-	return func(f *Furnace) {
-		f.Tailwind = value
-	}
-}
-
 func writeOutputFile(path string, content []byte) {
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
@@ -170,6 +162,8 @@ func (f *Furnace) Output() {
 	for _, c := range f.Components {
 		f.Styles += c.Style
 	}
+
+	f.Styles = sortStyles(f.Styles)
 
 	if f.StyleOutputFile != "" {
 		writeOutputFile(f.StyleOutputFile, []byte(f.Styles))
