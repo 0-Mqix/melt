@@ -22,9 +22,10 @@ type Furnace struct {
 	AutoReloadEventUrl string //the url that is pointed to f.ReloadEventHandler
 	PrintRenderOutput  bool   //prints out the template after a render
 	AutoUpdateImports  bool   //update all imports with the renamed path only works with the watcher
-	SCSS               bool   //scss in <style> -> dart sass -> localize the styles to the component
+	Style              bool   //scss in <style> -> dart sass -> localize the styles to the component
 	StyleOutputFile    string //if not empty melt will write all the styles to this file
 	OutputFile         string //if not empty melt will write a output file that is used to use your components in production
+	StylePrefix        string //the prefix of the css melt adds to the elements for localization
 
 	Components map[string]*Component
 	Roots      map[string]*Root
@@ -131,9 +132,10 @@ func WithOutput(outputFile, styleOutputFile string) meltOption {
 	}
 }
 
-func WithSCSS(value bool) meltOption {
+func WithStyle(value bool, prefix string) meltOption {
 	return func(f *Furnace) {
-		f.SCSS = value
+		f.Style = value
+		f.StylePrefix = prefix
 	}
 }
 
@@ -163,7 +165,7 @@ func (f *Furnace) Output() {
 		f.Styles += c.Style
 	}
 
-	f.Styles = sortStyles(f.Styles)
+	f.Styles = f.sortStyles(f.Styles)
 
 	if f.StyleOutputFile != "" {
 		writeOutputFile(f.StyleOutputFile, []byte(f.Styles))

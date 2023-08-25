@@ -7,7 +7,6 @@ import (
 
 	"github.com/0-mqix/melt"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 //go:embed "melt.json"
@@ -18,8 +17,9 @@ func main() {
 	m := melt.New(
 		melt.WithAutoReloadEvent("/reload_event", true, "./templates"),
 		melt.WithOutput("./melt.json", "./melt.css"),
-		melt.WithComponentComments(true),
-		melt.WithSCSS(true),
+		// melt.WithComponentComments(true),
+		melt.WithStyle(true, "x"),
+		// melt.WithPrintRenderOutput(true),
 	)
 
 	// build, _ := build.ReadFile("melt.json")
@@ -32,7 +32,7 @@ func main() {
 
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
+	// r.Use(middleware.Logger)
 
 	items := make(map[int]string)
 	id := 0

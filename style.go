@@ -20,7 +20,7 @@ const (
 	MELT_INTERNAL_SCOPED_PREFIX = "#MELT-INTERNAL-SCOPED"
 )
 
-func sortStyles(styles string) string {
+func (f *Furnace) sortStyles(styles string) string {
 
 	var scopedStyles string
 	var globalStyles string
@@ -37,11 +37,11 @@ func sortStyles(styles string) string {
 
 		for _, s := range strings.Split(selector, ".") {
 
-			if strings.Index(s, "melt-scoped") == 0 {
+			if strings.Index(s, f.StylePrefix+"-scoped") == 0 {
 				scoped = true
 				break
 
-			} else if strings.Index(s, "melt-") == 0 {
+			} else if strings.Index(s, f.StylePrefix+"-") == 0 {
 				global = false
 				break
 			}
@@ -66,7 +66,7 @@ func sortStyles(styles string) string {
 	return styles + scopedStyles + globalStyles
 }
 
-func scss(component, styles string, document *html.Node) (string, []string, error) {
+func (f *Furnace) style(component, styles string, document *html.Node) (string, []string, error) {
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -118,7 +118,7 @@ func scss(component, styles string, document *html.Node) (string, []string, erro
 	transpiler.Close()
 
 	//STEP: LOCALIZE CSS
-	styleId := "melt-" + component
+	styleId := f.StylePrefix + "-" + component
 	selectors := make(map[string]string)
 
 	foundStyles := styleSelectorRegex.FindAllStringSubmatch(styleResult.CSS, -1)
@@ -157,19 +157,19 @@ func scss(component, styles string, document *html.Node) (string, []string, erro
 		}
 
 		if scoped {
-			styles += name + ".melt-scoped-" + component + rules
+			styles += name + "." + f.StylePrefix + "-scoped-" + component + rules
 			scopedSelectors = append(scopedSelectors, name)
 		} else {
 			styles += name + "." + styleId + rules
 		}
 
-		addMeltSelectors(results, styleId)
+		f.addMeltSelectors(results, styleId)
 	}
 
 	return styles, scopedSelectors, nil
 }
 
-func addMeltSelectors(elements []*html.Node, styleId string) {
+func (f *Furnace) addMeltSelectors(elements []*html.Node, styleId string) {
 
 	for _, n := range elements {
 		if strings.Index(n.Data, "melt-") == 0 {
@@ -216,7 +216,7 @@ func addMeltSelectors(elements []*html.Node, styleId string) {
 	}
 }
 
-func addScopedMeltSelectors(component string, scoped []string, document *html.Node) error {
+func (f *Furnace) addScopedMeltSelectors(component string, scoped []string, document *html.Node) error {
 	for _, name := range scoped {
 
 		selector, err := css.Parse(name)
@@ -227,7 +227,7 @@ func addScopedMeltSelectors(component string, scoped []string, document *html.No
 		}
 
 		results := selector.Select(document)
-		addMeltSelectors(results, "melt-scoped-"+component)
+		f.addMeltSelectors(results, f.StylePrefix+"-scoped-"+component)
 	}
 
 	return nil

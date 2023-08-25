@@ -1,6 +1,11 @@
 <import>Test templates/1.html</import>
+<import>Yeet templates/yeet.html</import>
 
-<Test />
+
+<Yeet .Name="max">
+  <div>im a child</div>
+  <Test />
+</Yeet>
 
 <div class="shop">
   <form class="add" hx-post="/add" hx-target="#items" hx-swap="outerHTML">

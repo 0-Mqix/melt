@@ -87,7 +87,6 @@ func (f *Furnace) pasteComponent(
 			//prefix so variable localization works
 			prefix := fmt.Sprintf("$%s_", component.Name)
 			name = prefixTemplateVariables(string(name), "$", prefix)
-			name = prefixTemplateVariables(name, ".", "$root")
 
 			if !(value[0] == '.' || value[0] == '$') {
 				value = strings.Trim(value, "\"")

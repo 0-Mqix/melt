@@ -56,6 +56,8 @@ func handleEvent(e fs.Event, f *Furnace) func() {
 		defer mutex.Unlock()
 
 		path := strings.ToLower(e.Name)
+		path = filepath.Clean(path)
+		path = filepath.ToSlash(path)
 
 		if e.Has(fs.Write) {
 			name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))

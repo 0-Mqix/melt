@@ -200,7 +200,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		case "style":
 			result, ok := getStyle(n)
 			if ok {
-				if !f.SCSS {
+				if !f.Style {
 					fmt.Println("[MELT] [SCSS] is not enabled")
 					break
 				}
@@ -222,8 +222,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 	var scoped []string
 
-	if f.SCSS {
-		style, scoped, _ = scss(name, style, document)
+	if f.Style {
+		style, scoped, _ = f.style(name, style, document)
 	}
 
 	//STEP: CREATE RESULT
@@ -237,8 +237,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	//STEP: USE COMPONENTS
 	f.useComponents(document, component, imports)
 
-	if f.SCSS {
-		addScopedMeltSelectors(name, scoped, document)
+	if f.Style {
+		f.addScopedMeltSelectors(name, scoped, document)
 	}
 
 	//STEP: CLEAN HTML
