@@ -1,5 +1,8 @@
 # Melt
-  svelte like component files for the html/template standard package.
+file based components on top of the html/template standard package.
+<br>
+<br>
+[cheet-sheet.md](cheet-sheet.md)
 
 ## Table of Content
 - [Imports](#imports)
@@ -67,6 +70,6 @@
 ```
 ### ```<Slot />```
 - All html children get placed here.
-### ```<-Name />```
+### ```<-? />```
 - Starts by a - and must be followed by a Uppercase Letter
 - The string from the argument with the same name gets placed here as html.
