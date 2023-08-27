@@ -6,7 +6,6 @@
 - [Component Arguments](#component-arguments)
 - [Child Components](#child-components)
 
-<a name="imports"></a>
 ## Imports
 ```html
 <!-- component.html -->
@@ -21,7 +20,6 @@
 ```
 - Imports can be named anything but it has to start with a Uppercase Letter.
 
-<a name="component-arguments"></a>
 ## Component Arguments
 ```html
 <!-- hello.html -->
@@ -47,7 +45,6 @@
 ### ```.```
 - They work as normal but if you include a component that has used them it will be required that the value is passed in by execution unless they are passed as a component argument.
 
-<a name="child-components"></a>
 ## Child Components
 ```html
 <!-- component.html -->
