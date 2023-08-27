@@ -2,7 +2,7 @@
 file based components on top of the html/template standard package.
 <br>
 <br>
-[cheet-sheet.md](cheet-sheet.md)
+[cheat-sheet.md](cheat-sheet.md)
 
 ## Table of Content
 - [Imports](#imports)
