@@ -1,5 +1,5 @@
 # Melt
-file based components on top of the html/template standard package.
+Single file components on top of the html/template standard package.
 <br>
 <br>
 [cheat-sheet.md](cheat-sheet.md)
