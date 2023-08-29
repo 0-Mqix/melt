@@ -12,6 +12,7 @@ import (
 
 /*
 TODO:
+  - relative paths for imports
   - make readme with documentation
 */
 
