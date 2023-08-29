@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -17,8 +18,8 @@ func main() {
 	m := melt.New(
 		melt.WithAutoReloadEvent("/reload_event", true, "./templates"),
 		melt.WithOutput("./melt.json", "./melt.css"),
-		// melt.WithComponentComments(true),
-		melt.WithStyle(true, "x"),
+		melt.WithComponentComments(true),
+		melt.WithStyle(true, "melt"),
 		// melt.WithPrintRenderOutput(true),
 	)
 
@@ -73,5 +74,5 @@ func main() {
 
 	r.Get("/reload_event", m.ReloadEventHandler)
 
-	http.ListenAndServe(":3000", r)
+	fmt.Println("[HTTP]", http.ListenAndServe(":3000", r))
 }

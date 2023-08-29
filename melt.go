@@ -12,7 +12,6 @@ import (
 
 /*
 TODO:
-  - custom scss prefix
   - make readme with documentation
 */
 

@@ -23,9 +23,9 @@ var (
 	encoder = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz123456").WithPadding(base32.NoPadding)
 )
 
-type componentImport struct {
-	Name string
-	Path string
+type Pair struct {
+	Key   string
+	Value string
 }
 
 func getStyle(n *html.Node) (string, bool) {
@@ -43,7 +43,7 @@ func applyStyleId(n *html.Node, styleId string, selectors map[string]bool) {
 	}
 }
 
-func getImport(n *html.Node) (*componentImport, bool) {
+func getPair(n *html.Node) (*Pair, bool) {
 	if n.FirstChild == nil || n.FirstChild.Type != html.TextNode {
 		return nil, false
 	}
@@ -55,9 +55,9 @@ func getImport(n *html.Node) (*componentImport, bool) {
 		return nil, false
 	}
 
-	return &componentImport{
-		Name: data[0],
-		Path: strings.ToLower(data[1]),
+	return &Pair{
+		Key:   data[0],
+		Value: strings.ToLower(data[1]),
 	}, true
 }
 
@@ -179,7 +179,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	var nodes []*html.Node
 
 	style := ""
-	imports := make(map[string]*componentImport)
+	imports := make(map[string]*Pair)
+	defaults := make(map[string]string)
 
 	extractFromBody(document, &nodes)
 	var melted []*html.Node
@@ -192,16 +193,27 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 		switch n.Data {
 		case "import":
-			result, ok := getImport(n)
+			result, ok := getPair(n)
 			if ok {
-				imports[result.Name] = result
+				imports[result.Key] = result
+			}
+		case "default":
+			result, ok := getPair(n)
+			if ok {
+
+				if result.Key[0] != '$' {
+					fmt.Printf("[MELT] default is only supported for $ variables\n-> %s -> <default>%s %s</default>\n", path, result.Key, result.Value)
+					break
+				}
+
+				defaults[result.Key] = result.Value
 			}
 
 		case "style":
 			result, ok := getStyle(n)
 			if ok {
 				if !f.Style {
-					fmt.Println("[MELT] [SCSS] is not enabled")
+					fmt.Println("[MELT] [SCSS] is not enabled\n->", path)
 					break
 				}
 				style += result
@@ -232,6 +244,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		Path:     path,
 		Style:    style,
 		Template: template.New(name).Funcs(Functions),
+
+		defaults: defaults,
 	}
 
 	//STEP: USE COMPONENTS

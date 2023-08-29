@@ -54,16 +54,24 @@ const (
 	ArgumentTypeConstant
 )
 
+func (c *Component) copyDefaults() map[string]string {
+	result := make(map[string]string)
+	for k, v := range c.defaults {
+		result[k] = v
+	}
+	return result
+}
+
 func (f *Furnace) pasteComponent(
 	n *html.Node,
 	component *Component,
 	attributes []string,
 	partials map[string]string,
 ) {
-	buffer := bytes.NewBufferString("")
 	declarations := ""
-
+	buffer := bytes.NewBufferString("")
 	arguments := make(map[string]Argument)
+	pairs := component.copyDefaults()
 
 	for _, attribute := range attributes {
 		attribute = strings.TrimSpace(attribute)
@@ -77,13 +85,12 @@ func (f *Furnace) pasteComponent(
 			continue
 		}
 
-		name := pair[0]
-		value := pair[1]
+		pairs[pair[0]] = pair[1]
+	}
 
+	for name, value := range pairs {
 		switch name[0] {
-
 		case '.', '$':
-
 			//prefix so variable localization works
 			prefix := fmt.Sprintf("$%s_", component.Name)
 			name = prefixTemplateVariables(string(name), "$", prefix)
@@ -107,9 +114,7 @@ func (f *Furnace) pasteComponent(
 			declarations += fmt.Sprintf("{{%s}}", encoded)
 
 			f.lastArgumentId.Add(1)
-
 		}
-
 	}
 
 	argumented := TemplateFunctionRegex.ReplaceAllStringFunc(component.partialsTemplate, func(s string) string {
@@ -146,7 +151,7 @@ func (f *Furnace) pasteComponent(
 	}
 }
 
-func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[string]*componentImport) {
+func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[string]*Pair) {
 	if n.Type == html.ElementNode && strings.Index(n.Data, "melt-") == 0 {
 
 		data := strings.Split(n.Data, "-")
@@ -201,8 +206,8 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 			goto Next
 		}
 
-		component, ok := f.GetComponent(source.Path, false)
-		f.AddDependency(source.Path, self.Path)
+		component, ok := f.GetComponent(source.Value, false)
+		f.AddDependency(source.Value, self.Path)
 
 		if !ok {
 			goto Next
@@ -211,7 +216,7 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 		if f.ComponentComments {
 			n.AppendChild(&html.Node{
 				Type:      html.CommentNode,
-				Data:      fmt.Sprintf(" + %s: %s ", name, source.Path),
+				Data:      fmt.Sprintf(" + %s: %s ", name, source.Value),
 				Namespace: n.Namespace,
 			})
 		}
@@ -241,7 +246,6 @@ func (f *Furnace) pastePartials(name, raw string, partials map[string]string) st
 			},
 		})
 
-	// STEP: MAKE COMPONENT PARTIALS TEMPLATE
 	template.Parse(raw)
 
 	var data struct {
