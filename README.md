@@ -38,7 +38,7 @@ Single file components on top of the html/template standard package.
 <import>Hello hello.html</import>
 <import>Number number.html</import>
 
-<Component .Name="mqix" />
+<Hello .Name="mqix" />
 
 <Number />
 <Number $number=13 />
@@ -65,7 +65,6 @@ Single file components on top of the html/template standard package.
 <Component -Title="<h1>im a title :)</h1>">
   <div>foo<div>
   <div>bar<div>
-  <span>baz</span>
 </Component>
 ```
 ### ```<Slot />```
