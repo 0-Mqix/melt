@@ -37,7 +37,8 @@ type Component struct {
 	Name  string `json:"name"`
 	Path  string `json:"path"`
 
-	partialsTemplate string `json:"-"`
+	defaults         map[string]string `json:"-"`
+	partialsTemplate string            `json:"-"`
 }
 
 func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {

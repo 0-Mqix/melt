@@ -1,11 +1,15 @@
 <import>Test templates/1.html</import>
-<import>Yeet templates/yeet.html</import>
+<import>X templates/yeet.html</import>
 
-
-<Yeet .Name="max">
-  <div>im a child</div>
+<X -Test="<div>div</div>">
+  <div>im a child 1</div>
   <Test />
-</Yeet>
+</X>
+
+<X $name="max">
+  <div>im a child 2</div>
+</X>
+
 
 <div class="shop">
   <form class="add" hx-post="/add" hx-target="#items" hx-swap="outerHTML">
@@ -14,6 +18,8 @@
   </form>
   {{template "items" .Items }}
 </div>
+
+<div>max is lazy</div>
 
 {{define "items" }}
 <div id="items" class="flex-col">
