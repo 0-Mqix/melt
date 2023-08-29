@@ -12,7 +12,7 @@ import (
 
 /*
 TODO:
-  - custom scss prefix
+  - relative paths for imports
   - make readme with documentation
 */
 

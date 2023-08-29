@@ -30,7 +30,8 @@ Single file components on top of the html/template standard package.
 ```
 ```html
 <!-- number.html -->
-{{$number = 0 }}
+<default>$number 0</default>
+
 <div>the number is {{ $number }}</div>
 ```
 ```html
@@ -45,8 +46,14 @@ Single file components on top of the html/template standard package.
 ```
 ### ```$```
 - Just template variables.
+- If you want to set a default you can do this by declaring
+it like the example above in the number.html snippet.
+
 ### ```.```
 - They work as normal but if you include a component that has used them it will be required that the value is passed in by execution unless they are passed as a component argument.
+
+### note
+If the the argument value is a constant (numbers and strings) it will replace the variable in the template with the value.
 
 ## Child Components
 ```html
