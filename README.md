@@ -52,7 +52,7 @@ it like the example above in the number.html snippet.
 ### ```.```
 - They work as normal but if you include a component that has used them it will be required that the value is passed in by execution unless they are passed as a component argument.
 
-### note
+### constant values
 If the the argument value is a constant (numbers and strings) it will replace the variable in the template with the value.
 
 ## Child Components
