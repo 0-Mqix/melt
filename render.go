@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -28,19 +29,20 @@ type Pair struct {
 	Value string
 }
 
+func formatPath(path string) string {
+	path = strings.ToLower(path)
+	path = filepath.Clean(path)
+	path = filepath.ToSlash(path)
+
+	return path
+}
+
 func getStyle(n *html.Node) (string, bool) {
 	if n.Type == html.ElementNode && n.Data == "style" {
 		return n.FirstChild.Data, true
 	}
 
 	return "", false
-}
-
-func applyStyleId(n *html.Node, styleId string, selectors map[string]bool) {
-
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		applyStyleId(c, styleId, selectors)
-	}
 }
 
 func getPair(n *html.Node) (*Pair, bool) {
@@ -57,7 +59,7 @@ func getPair(n *html.Node) (*Pair, bool) {
 
 	return &Pair{
 		Key:   data[0],
-		Value: strings.ToLower(data[1]),
+		Value: data[1],
 	}, true
 }
 
@@ -185,6 +187,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	extractFromBody(document, &nodes)
 	var melted []*html.Node
 
+	directory := filepath.Dir(path)
+
 	for _, n := range nodes {
 		if n.Type != html.ElementNode {
 			melted = append(melted, n)
@@ -194,11 +198,16 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		switch n.Data {
 		case "import":
 			result, ok := getPair(n)
+
 			if ok {
+				path := filepath.Join(directory, result.Value)
+				result.Value = filepath.ToSlash(path)
 				imports[result.Key] = result
 			}
+
 		case "default":
 			result, ok := getPair(n)
+
 			if ok {
 
 				if result.Key[0] != '$' {

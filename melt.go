@@ -12,7 +12,6 @@ import (
 
 /*
 TODO:
-  - relative paths for imports
   - make readme with documentation
 */
 
@@ -115,20 +114,20 @@ func WithComponentComments(value bool) meltOption {
 	}
 }
 
-func WithAutoReloadEvent(reloadEventUrl string, autoUpdateImports bool, paths ...string) meltOption {
+func WithAutoReloadEvent(reloadEventUrl string, autoUpdateImports bool, extentions []string, paths ...string) meltOption {
 	return func(f *Furnace) {
 		f.AutoReloadEvent = true
 		f.AutoReloadEventUrl = reloadEventUrl
 		f.AutoUpdateImports = autoUpdateImports
 
-		go f.StartWatcher(paths...)
+		go f.StartWatcher(extentions, paths...)
 	}
 }
 
 func WithOutput(outputFile, styleOutputFile string) meltOption {
 	return func(f *Furnace) {
-		f.StyleOutputFile = styleOutputFile
-		f.OutputFile = outputFile
+		f.StyleOutputFile = formatPath(styleOutputFile)
+		f.OutputFile = formatPath(outputFile)
 	}
 }
 
@@ -186,7 +185,7 @@ func (f *Furnace) Output() {
 				continue
 			}
 
-			root, err := f.createRoot(path, bytes.NewBuffer(raw), false)
+			root, _ := f.createRoot(path, bytes.NewBuffer(raw), false)
 			output.Roots = append(output.Roots, root)
 		}
 

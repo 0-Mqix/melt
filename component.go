@@ -13,7 +13,6 @@ import (
 )
 
 func (f *Furnace) AddDependency(path, to string) {
-
 	if f.productionMode {
 		fmt.Println("[MELT] dependencies are not supported in production mode")
 		return
@@ -42,9 +41,7 @@ type Component struct {
 }
 
 func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
-	path = strings.ToLower(path)
-	path = filepath.Clean(path)
-	path = filepath.ToSlash(path)
+	path = formatPath(path)
 
 	component, ok := f.Components[path]
 
@@ -63,8 +60,7 @@ func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 		return nil, false
 	}
 
-	name, _ := strings.CutSuffix(path, filepath.Ext(path))
-	component, err = f.Render(ComponentName(name), bytes.NewBuffer(raw), path)
+	component, err = f.Render(ComponentName(path), bytes.NewBuffer(raw), path)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
@@ -103,10 +99,10 @@ func (f *Furnace) AddComponent(path string, component *Component) {
 	f.Components[path] = component
 }
 
-func ComponentName(input string) string {
-	input = filepath.Base(input)
+func ComponentName(path string) string {
+	name, _ := strings.CutSuffix(filepath.Base(path), filepath.Ext(path))
 
-	words := strings.FieldsFunc(input, func(r rune) bool {
+	words := strings.FieldsFunc(name, func(r rune) bool {
 		return unicode.IsSpace(r) || r == '_' || r == '-'
 	})
 

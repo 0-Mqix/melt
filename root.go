@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 	text "text/template"
 
 	"golang.org/x/net/html"
@@ -42,9 +40,7 @@ func (r *Root) Write(w http.ResponseWriter, component *Component, bodyData, root
 }
 
 func (f *Furnace) GetRoot(path string, force bool) (*Root, bool) {
-	path = strings.ToLower(path)
-	path = filepath.Clean(path)
-	path = filepath.ToSlash(path)
+	path = formatPath(path)
 
 	root, ok := f.Roots[path]
 

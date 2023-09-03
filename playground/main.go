@@ -16,7 +16,7 @@ var build embed.FS
 func main() {
 
 	m := melt.New(
-		melt.WithAutoReloadEvent("/reload_event", true, "./templates"),
+		melt.WithAutoReloadEvent("/reload_event", true, []string{".html"}, "./"),
 		melt.WithOutput("./melt.json", "./melt.css"),
 		melt.WithComponentComments(true),
 		melt.WithStyle(true, "melt"),

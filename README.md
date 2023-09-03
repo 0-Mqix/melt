@@ -1,4 +1,7 @@
 # Melt
+
+<img width=300px  src="melt.svg">
+
 Single file components on top of the html/template standard package.
 <br>
 <br>

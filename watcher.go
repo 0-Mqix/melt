@@ -1,6 +1,7 @@
 package melt
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -22,10 +23,23 @@ var (
 	created struct {
 		component *Component
 		path      string
+		raw       []byte
 	}
 )
 
 const DELAY = time.Duration(50 * time.Millisecond)
+
+func hasExtention(path string, extentions []string) bool {
+	extention := filepath.Ext(path)
+
+	for _, x := range extentions {
+		if extention == x {
+			return true
+		}
+	}
+
+	return false
+}
 
 func (f *Furnace) update(path string) {
 	fmt.Println("[MELT] updating:", path)
@@ -55,35 +69,54 @@ func handleEvent(e fs.Event, f *Furnace) func() {
 		mutex.Lock()
 		defer mutex.Unlock()
 
-		path := strings.ToLower(e.Name)
-		path = filepath.Clean(path)
-		path = filepath.ToSlash(path)
+		path := formatPath(e.Name)
+		name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		root := name == "root" || strings.HasPrefix(name, "root_") || strings.HasPrefix(name, "root-")
 
 		if e.Has(fs.Write) {
-			name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-			if name == "root" || strings.HasPrefix(name, "root_") || strings.HasPrefix(name, "root-") {
+			if root {
 				f.GetRoot(path, true)
+				fmt.Println("[MELT] updating:", path)
 			} else {
 				f.update(path)
 			}
 
 		} else if e.Has(fs.Create) {
+			if root {
+				f.GetRoot(path, true)
 
-			if c, ok := f.GetComponent(path, true); ok {
+			} else if c, ok := f.GetComponent(path, true); ok {
 				created.component = c
 				created.path = path
-
+				created.raw, _ = os.ReadFile(path)
 				f.updateDependencies(path)
 			}
 
-		} else if e.Has(fs.Rename) {
-			c, ok := f.Components[path]
+		} else if e.Has(fs.Rename) || e.Has(fs.Remove) {
 
-			if !ok || created.component == nil {
+			if root {
+				delete(f.Roots, path)
 				return
 			}
 
-			if c.String != created.component.String {
+			c, ok := f.Components[path]
+
+			if !ok {
+				return
+			}
+
+			if created.component == nil {
+				if e.Has(fs.Remove) {
+					delete(f.dependencyOf, path)
+					delete(f.Components, path)
+				}
+
+				return
+			}
+
+			new, err := f.Render(ComponentName(path), bytes.NewBuffer(created.raw), path)
+
+			if err != nil || c.String != new.String {
 				return
 			}
 
@@ -99,17 +132,13 @@ func handleEvent(e fs.Event, f *Furnace) func() {
 				delete(f.dependencyOf, path)
 				delete(f.Components, path)
 			}
-
-		} else if e.Has(fs.Remove) {
-			delete(f.Components, path)
-			f.updateDependencies(path)
 		}
 
 		f.SendReloadEvent()
 	}
 }
 
-func (f *Furnace) StartWatcher(paths ...string) {
+func (f *Furnace) StartWatcher(extentions []string, paths ...string) {
 	if f.productionMode {
 		fmt.Println("[MELT] watcher is disabled in production")
 		return
@@ -128,8 +157,15 @@ func (f *Furnace) StartWatcher(paths ...string) {
 		for {
 			select {
 			case e, ok := <-watcher.Events:
+
 				if !ok {
-					return
+					continue
+				}
+
+				path := formatPath(e.Name)
+
+				if !hasExtention(path, extentions) || path == f.StyleOutputFile || path == f.OutputFile {
+					continue
 				}
 
 				event := fmt.Sprintf("%s-%s", e.Name, e.Op.String())
@@ -140,9 +176,11 @@ func (f *Furnace) StartWatcher(paths ...string) {
 				} else {
 					timer.Reset(DELAY)
 				}
+
 			case err, ok := <-watcher.Errors:
+
 				if !ok {
-					return
+					continue
 				}
 
 				panic(fmt.Sprintf("[MELT] watcher: %v", err))
@@ -151,11 +189,21 @@ func (f *Furnace) StartWatcher(paths ...string) {
 	}()
 
 	for _, path := range paths {
-		err = watcher.Add(path)
+		filepath.Walk(path, func(path string, info os.FileInfo, _ error) error {
+			if info.IsDir() {
+				err = watcher.Add(path)
 
-		if err != nil {
-			fmt.Println("[MELT] watcher:", err)
-		}
+				if err != nil {
+					fmt.Println("[MELT] watcher:", err)
+				}
+			}
+			return nil
+		})
+	}
+
+	fmt.Println("[MELT] watching paths:")
+	for _, path := range watcher.WatchList() {
+		fmt.Printf("-> %s\n", formatPath(path))
 	}
 
 	select {}
@@ -219,6 +267,7 @@ func (f *Furnace) ReloadEventHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateImportPath(file, old, new string) error {
+	fmt.Println(file, old, new)
 
 	f, err := os.OpenFile(file, os.O_RDWR, 0644)
 	if err != nil {
@@ -232,16 +281,25 @@ func updateImportPath(file, old, new string) error {
 		return err
 	}
 
+	directory := filepath.Dir(file)
+
 	modified := ImportRegex.ReplaceAllFunc(content, func(b []byte) []byte {
 
 		data := ImportRegex.FindStringSubmatch(string(b))
-		path := strings.ToLower(data[3])
+		path := formatPath(filepath.Join(directory, data[3]))
 
 		if path != old {
 			return b
 		}
 
-		return []byte(data[1] + data[2] + " " + new + data[4])
+		relative, err := filepath.Rel(directory, new)
+
+		if err != nil {
+			fmt.Println("[MELT] failed updating path")
+			return b
+		}
+
+		return []byte(data[1] + data[2] + " " + formatPath(relative) + data[4])
 	})
 
 	_, err = f.Seek(0, 0)

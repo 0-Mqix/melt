@@ -69,7 +69,6 @@ func (f *Furnace) pasteComponent(
 	partials map[string]string,
 ) {
 	declarations := ""
-	buffer := bytes.NewBufferString("")
 	arguments := make(map[string]Argument)
 	pairs := component.copyDefaults()
 
@@ -139,7 +138,7 @@ func (f *Furnace) pasteComponent(
 	partialized := f.pastePartials(component.Name, argumented, partials)
 
 	//prepend the declarations to the arugmented and the pasted partialized component html
-	buffer = bytes.NewBufferString(declarations + partialized)
+	buffer := bytes.NewBufferString(declarations + partialized)
 
 	nodes := make([]*html.Node, 0)
 	element, _ := html.Parse(buffer)
