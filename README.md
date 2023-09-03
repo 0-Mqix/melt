@@ -138,3 +138,7 @@ So this outputs the following.
 ### note
 - For this feature to work you must have [**dart sass**](https://github.com/sass/dart-sass) installed.
 - Comments in stlye get removed in output.
+- it sorts the output css in the following order.
+  1. styles
+  2. scoped styles
+  2. styles without an melt prefix 
