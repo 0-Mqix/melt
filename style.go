@@ -13,6 +13,7 @@ import (
 
 var (
 	styleSelectorRegex = regexp.MustCompile(`(?m)(?s)([^{}]+)\s*({.+?})`)
+	styleCommentRegex  = regexp.MustCompile(`(?m)(?s)\/\*.+?\*\/`)
 )
 
 const (
@@ -74,6 +75,7 @@ func (f *Furnace) style(component, styles string, document *html.Node) (string, 
 		}
 	}()
 
+	styles = styleCommentRegex.ReplaceAllString(styles, "")
 	scopedSelectors := make([]string, 0)
 
 	//STEP: PREPARE SCSS FOR % GLOBAL

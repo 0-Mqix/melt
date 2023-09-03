@@ -11,6 +11,8 @@ Single file components on top of the html/template standard package.
 - [Imports](#imports)
 - [Component Arguments](#component-arguments)
 - [Child Components](#child-components)
+- [Style](#style)
+- [Watcher & Production](#watcher-&-production)
 
 ## Imports
 ```html
@@ -80,5 +82,54 @@ If the the argument value is a constant (numbers and strings) it will replace th
 ### ```<Slot />```
 - All html children get placed here.
 ### ```<-? />```
-- Starts by a - and must be followed by a Uppercase Letter
+- Starts by a - and must be followed by a Uppercase Letter.
 - The string from the argument with the same name gets placed here as html.
+
+
+## Style
+```go
+	m := melt.New(
+		melt.WithStyle(true, "melt"),
+	)
+```
+Just scss powered by [dart sass](https://github.com/sass/dart-sass) with a little magic.
+
+### Localization 
+- Each component has its own style scope. this is done by adding a class to selected elements with the prefix and the component name.
+- Removes unused styles.
+- Escape of it by prefixing the selector with 
+  - ```%s``` all inside component including imports (scoped)
+  - ```%g``` every component with class name (global)
+```html
+  <!-- Name.html -->
+  <div class="name">melt</div>
+
+  <style>
+    .name { color: red }
+  </style>
+```
+
+```html
+  <!-- index.html -->
+  <import>Name name.html</import>
+
+  <Name />
+
+  <style>
+    %g .name { color: green } /* select inside the component */
+    %s .name { color: blue } /* select globaly */
+  </style>
+```
+```css
+  /* output.css */
+  .name.melt-Name { color: red }
+  .name.melt-Index { color:blue }
+  .color { color: green }
+```
+So this results in the following.
+<br>
+<img src="style-example.png" />
+
+### note
+- For this feature to work you must have [**dart sass**](https://github.com/sass/dart-sass) installed.
+- Comments in stlye get removed in output.
