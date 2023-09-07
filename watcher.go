@@ -134,7 +134,9 @@ func handleEvent(e fs.Event, f *Furnace) func() {
 			}
 		}
 
-		f.SendReloadEvent()
+		if f.WatcherSendReloadEvent {
+			f.SendReloadEvent()
+		}
 	}
 }
 

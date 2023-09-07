@@ -16,15 +16,16 @@ TODO:
 */
 
 type Furnace struct {
-	ComponentComments  bool   //adds comments to the html so you can see wat the source of the html is
-	AutoReloadEvent    bool   //enables the live reloading features you still have to call f.StartWatcher(paths ...string) or you can just use the option WithAutoReloadEvent
-	AutoReloadEventUrl string //the url that is pointed to f.ReloadEventHandler
-	PrintRenderOutput  bool   //prints out the template after a render
-	AutoUpdateImports  bool   //update all imports with the renamed path only works with the watcher
-	Style              bool   //scss in <style> -> dart sass -> localize the styles to the component
-	StyleOutputFile    string //if not empty melt will write all the styles to this file
-	OutputFile         string //if not empty melt will write a output file that is used to use your components in production
-	StylePrefix        string //the prefix of the css melt adds to the elements for localization
+	ComponentComments      bool   //adds comments to the html so you can see wat the source of the html is
+	AutoReloadEvent        bool   //enables the live reloading features you still have to call f.StartWatcher(paths ...string) or you can just use the option WithAutoReloadEvent
+	AutoReloadEventUrl     string //the url that is pointed to f.ReloadEventHandler
+	PrintRenderOutput      bool   //prints out the template after a render
+	AutoUpdateImports      bool   //update all imports with the renamed path only works with the watcher
+	WatcherSendReloadEvent bool   //send a reload event on watcher event
+	Style                  bool   //scss in <style> -> dart sass -> localize the styles to the component
+	StyleOutputFile        string //if not empty melt will write all the styles to this file
+	OutputFile             string //if not empty melt will write a output file that is used to use your components in production
+	StylePrefix            string //the prefix of the css melt adds to the elements for localization
 
 	Components map[string]*Component
 	Roots      map[string]*Root
@@ -114,11 +115,12 @@ func WithComponentComments(value bool) meltOption {
 	}
 }
 
-func WithWatcher(reloadEventUrl string, autoUpdateImports bool, extentions []string, paths ...string) meltOption {
+func WithWatcher(reloadEventUrl string, autoUpdateImports, watcherSendReloadEvent bool, extentions []string, paths ...string) meltOption {
 	return func(f *Furnace) {
 		f.AutoReloadEvent = true
 		f.AutoReloadEventUrl = reloadEventUrl
 		f.AutoUpdateImports = autoUpdateImports
+		f.WatcherSendReloadEvent = watcherSendReloadEvent
 
 		go f.StartWatcher(extentions, paths...)
 	}
