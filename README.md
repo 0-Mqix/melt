@@ -8,13 +8,15 @@ Single file components on top of the html/template standard package.
 [cheat-sheet.md](cheat-sheet.md)
 
 ## Table of Content
-- [Imports](#imports)
+- [Imports / Components](#imports-/-components)
 - [Component Arguments](#component-arguments)
 - [Child Components](#child-components)
 - [Style](#style)
-- [Watcher & Production](#watcher-&-production)
+- [Watcher](#watcher)
+- [Output / Build](#build-/-output)
+- [Production Mode](#production-mode)
 
-## Imports
+## Imports / Components
 ```html
 <!-- component.html -->
 <div>hello!</div>
@@ -26,7 +28,29 @@ Single file components on top of the html/template standard package.
 <h1>component</h1>
 <Component />
 ```
+### Note
 - Imports can be named anything but it has to start with a Uppercase Letter.
+- They cant have ```<head>```,  ```<body>``` or ```<html>``` elements.
+
+## Roots
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+</head>
+
+<body>
+  {{ html .Body }}
+</body>
+
+</html>
+```
+- Because components are limited within the body. you need a place to set the head.
+- Root file names must always start with root.
+- Seperate template data.
 
 ## Component Arguments
 ```html
@@ -57,7 +81,7 @@ it like the example above in the number.html snippet.
 ### ```.```
 - They work as normal but if you include a component that has used them it will be required that the value is passed in by execution unless they are passed as a component argument.
 
-### constant values
+### Constant values
 If the the argument value is a constant (numbers and strings) it will replace the variable in the template with the value.
 
 ## Child Components
@@ -135,10 +159,36 @@ So this outputs the following.
 .color { color: green }
 ```
 
-### note
+### Note
 - For this feature to work you must have [**dart sass**](https://github.com/sass/dart-sass) installed.
 - Comments in stlye get removed in output.
 - it sorts the output css in the following order.
   1. styles
   2. scoped styles
-  2. styles without an melt prefix 
+  2. styles without an melt prefix
+
+## Watcher
+```go
+m := melt.New(
+  melt.WithWatcher("/reload_event", true, []string{".html"}, "./"),
+)
+
+r.Get("/reload_event", m.ReloadEventHandler)
+```
+- Its build in so no external tool needed.
+- Reloads page on change.
+- Option to enable path replacing. So if i rename or move a file the imports gets updated.
+
+## Build / Output
+```go
+m := melt.New(
+  melt.WithOutput("./melt.json", "./melt.css"),
+)
+```
+- Each time you get a component or root the output files gets updated.
+- The components and roots gets turned into json that can be used in production mode.
+- The style of the components gets turned into a css file.
+
+## Production Mode
+
+

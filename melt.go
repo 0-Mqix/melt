@@ -114,7 +114,7 @@ func WithComponentComments(value bool) meltOption {
 	}
 }
 
-func WithAutoReloadEvent(reloadEventUrl string, autoUpdateImports bool, extentions []string, paths ...string) meltOption {
+func WithWatcher(reloadEventUrl string, autoUpdateImports bool, extentions []string, paths ...string) meltOption {
 	return func(f *Furnace) {
 		f.AutoReloadEvent = true
 		f.AutoReloadEventUrl = reloadEventUrl
