@@ -252,7 +252,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		Name:     name,
 		Path:     path,
 		Style:    style,
-		Template: template.New(name).Funcs(Functions),
+		Template: template.New(name).Funcs(Functions).Funcs(f.ComponentFuncMap),
 
 		defaults: defaults,
 	}

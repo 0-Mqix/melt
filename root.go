@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	text "text/template"
 
 	"golang.org/x/net/html"
 )
@@ -131,11 +130,7 @@ func (f *Furnace) createRoot(path string, reader io.Reader, withReloadEvents boo
 	html.Render(buffer, document)
 	raw := buffer.String()
 
-	template := template.New(path).Funcs(text.FuncMap{
-		"html": func(raw string) template.HTML {
-			return template.HTML(raw)
-		},
-	})
+	template := template.New(path).Funcs(RootFunctions).Funcs(f.RootFuncMap)
 
 	template, err = template.Parse(raw)
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	text "text/template"
 )
 
 /*
@@ -27,9 +28,13 @@ type Furnace struct {
 	OutputFile             string //if not empty melt will write a output file that is used to use your components in production
 	StylePrefix            string //the prefix of the css melt adds to the elements for localization
 
-	Components map[string]*Component
-	Roots      map[string]*Root
-	Styles     string
+	Components       map[string]*Component
+	ComponentFuncMap template.FuncMap
+
+	Roots       map[string]*Root
+	RootFuncMap text.FuncMap
+
+	Styles string
 
 	reloadSubscribers map[string]chan bool
 	subscribersMutex  sync.Mutex
@@ -157,6 +162,17 @@ func writeOutputFile(path string, content []byte) {
 
 	file.Close()
 
+}
+
+func WithComponentFuncMap(funcs template.FuncMap) meltOption {
+	return func(f *Furnace) {
+		f.ComponentFuncMap = funcs
+	}
+}
+func WithRootFuncMap(funcs text.FuncMap) meltOption {
+	return func(f *Furnace) {
+		f.RootFuncMap = funcs
+	}
 }
 
 func (f *Furnace) Output() {
