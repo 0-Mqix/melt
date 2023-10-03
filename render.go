@@ -309,8 +309,15 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 	//STEP: DATA TYPE GENERATION & TEMPLATE MODIFICATION
 	if f.GenerationOutputFile != "" {
-		component.generationData, templateString = extractGenerationData(templateString)
+		component.generationData = extractGenerationData(templateString)
 	}
+
+	//STEP: REMOVE TYPE SYNTAX
+	templateString = TemplateFunctionRegex.ReplaceAllStringFunc(templateString, func(s string) string {
+		result := TemplateFunctionRegex.FindStringSubmatch(s)
+		content := TypeRegex.ReplaceAllString(result[1], "")
+		return "{{" + strings.TrimSpace(content) + "}}" + result[2]
+	})
 
 	// STEP: FORMAT HTML
 	formatter.Condense = true

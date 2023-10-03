@@ -139,7 +139,7 @@ func (f *Furnace) generate() {
 	}
 }
 
-func extractGenerationData(templateString string) (*generationData, string) {
+func extractGenerationData(templateString string) *generationData {
 	matches := TemplateFunctionRegex.FindAllStringSubmatch(templateString, -1)
 	blocks := []string{""}
 
@@ -233,17 +233,11 @@ func extractGenerationData(templateString string) (*generationData, string) {
 		}
 	}
 
-	templateString = TemplateFunctionRegex.ReplaceAllStringFunc(templateString, func(s string) string {
-		result := TemplateFunctionRegex.FindStringSubmatch(s)
-		content := TypeRegex.ReplaceAllString(result[1], "")
-		return "{{" + strings.TrimSpace(content) + "}}" + result[2]
-	})
-
 	return &generationData{
 		templates: templates,
 		imports:   imports,
 		calls:     calls,
-	}, templateString
+	}
 }
 
 func createWriteFuncs(name, path string, data *generationData) map[string]string {

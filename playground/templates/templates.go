@@ -16,8 +16,8 @@ var (
 )
 
 func Load(furnace *melt.Furnace) {
-	TemplatesGlobal = furnace.MustGetComponent("templates/global.html")
 	TemplatesIndex = furnace.MustGetComponent("templates/index.html")
+	TemplatesGlobal = furnace.MustGetComponent("templates/global.html")
 }
 
 type TemplatesGlobalData struct {
