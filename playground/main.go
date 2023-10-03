@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/0-mqix/melt"
-	"github.com/0-mqix/melt/playground/data"
 	"github.com/0-mqix/melt/playground/templates"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -54,7 +53,7 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 
 		templateData := templates.IndexData{
-			Name:    data.Data[int]{Data: 1},
+			Name:    "Max",
 			Number:  13,
 			Request: r,
 		}

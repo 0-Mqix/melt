@@ -4,45 +4,32 @@ package templates
 
 import (
 	"github.com/0-mqix/melt"
-	"github.com/0-mqix/melt/playground/data"
 	"io"
 	"net/http"
 )
 
 var (
-	Global2 *melt.Component
 	Global1 *melt.Component
+	Global2 *melt.Component
 	Index   *melt.Component
 )
 
 type GlobalHandlers struct {
 	Global1 func(r *http.Request) *Global1Data
-	Index   func(r *http.Request) *IndexData
 	Global2 func(r *http.Request) *Global2Data
+	Index   func(r *http.Request) *IndexData
 }
 
 func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
 	Global1 = furnace.MustGetComponent("templates/global1.html")
-	Index = furnace.MustGetComponent("templates/index.html")
 	Global2 = furnace.MustGetComponent("templates/global2.html")
+	Index = furnace.MustGetComponent("templates/index.html")
 
 	furnace.SetGlobalHandlers(map[string]func(r *http.Request) any{
 		"templates/global1.html": func(r *http.Request) any { return handlers.Global1(r) },
-		"templates/index.html":   func(r *http.Request) any { return handlers.Index(r) },
 		"templates/global2.html": func(r *http.Request) any { return handlers.Global2(r) },
+		"templates/index.html":   func(r *http.Request) any { return handlers.Index(r) },
 	})
-}
-
-type Global2Data struct {
-	Message string
-	Name    any
-}
-
-// generated write function for component
-//
-//	path: "templates/global2.html"
-func WriteGlobal2(w io.Writer, r *http.Request, data Global2Data) error {
-	return Global2.Write(w, r, data)
 }
 
 type Global1Data struct {
@@ -57,10 +44,22 @@ func WriteGlobal1(w io.Writer, r *http.Request, data Global1Data) error {
 	return Global1.Write(w, r, data)
 }
 
+type Global2Data struct {
+	Name    any
+	Message string
+}
+
+// generated write function for component
+//
+//	path: "templates/global2.html"
+func WriteGlobal2(w io.Writer, r *http.Request, data Global2Data) error {
+	return Global2.Write(w, r, data)
+}
+
 type IndexData struct {
+	Name    any
 	Request *http.Request
 	Number  int
-	Name    data.Data[int]
 }
 
 // generated write function for component

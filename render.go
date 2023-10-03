@@ -230,7 +230,11 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 			result, ok := getStyle(n)
 			if ok {
 				if !f.Style {
-					fmt.Println("[MELT] [SCSS] is not enabled\n->", path)
+
+					if f.GenerationOutputFile == "" {
+						fmt.Println("[MELT] [SCSS] is not enabled\n->", path)
+					}
+
 					break
 				}
 				style += result

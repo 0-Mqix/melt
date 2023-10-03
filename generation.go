@@ -36,7 +36,6 @@ func Generate(file string, extentions []string, paths ...string) {
 				root := name == "root" || strings.HasPrefix(name, "root_") || strings.HasPrefix(name, "root-")
 
 				if !root {
-					fmt.Println(name)
 					m.GetComponent(path, true)
 				}
 			}
@@ -139,7 +138,6 @@ func (f *Furnace) generate() {
 	if err == nil {
 		writeOutputFile(f.GenerationOutputFile, bytes)
 	} else {
-		fmt.Println(code)
 		fmt.Println("[MELT] mqix is monkey:", err)
 	}
 }

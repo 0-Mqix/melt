@@ -92,8 +92,6 @@ func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 			component.GlobalHandler = old.GlobalHandler
 		}
 		f.Components[path] = component
-
-		fmt.Println("add component:", component.Name, f.Components)
 	} else {
 		f.AddComponent(path, component)
 	}
