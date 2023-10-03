@@ -1,95 +1,10 @@
-<import>Test monkey.html</import>
-<import>X title-slot.html</import>
+<global />
+<import>Global global.html</import>
 
-<X -Test="<div>div</div>">
-  <div>im a child 1</div>
-  <Test />
-</X>
-<X $name="max">
-  <div>im a child 2</div>
-</X>
-
-
-<div class="shop">
-  <form class="add" hx-post="/add" hx-target="#items" hx-swap="outerHTML">
-    <input id="item" name="item" type="text">
-    <button type="submit">+</button>
-  </form>
-  {{template "items" .Items }}
+<div>
+	hello {{ .Name @type("data.Data[int]", "github.com/0-mqix/melt/playground/data") }}!
+  <Global />
 </div>
 
-<div>max is lazy</div>
 
-{{define "items" }}
-<div id="items" class="flex-col">
-  <h1>items</h1>
-  {{range $id, $item := . }}
-  <div class="item">
-    <div>{{ $item }}</div>
-    <div class="add" hx-delete="/add?item={{ $id }}" hx-target="#items" hx-swap="outerHTML">(add)</div>
-    <div class="delete" hx-delete="/delete?item={{ $id }}" hx-target="#items" hx-swap="outerHTML">(delete)</div>
-  </div>
-  {{end}}
-</div>
-{{end}}
-
-<style>
-  %g .monkey {
-    background-color: rebeccapurple !important;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  h1 {
-    padding: 0;
-    margin: 0;
-  }
-
-  #items {
-    width: 30%;
-  }
-
-  .item {
-    display: flex;
-    gap: 10px;
-
-    .delete,
-    .add {
-      border-radius: 0.8rem;
-      font-style: italic;
-      height: min-content;
-    }
-
-    .delete {
-      color: red;
-    }
-
-    .add {
-      color: green;
-    }
-  }
-
-  .shop {
-    display: flex;
-    width: 100%;
-    justify-content: space-between;
-
-    .add {
-      display: flex;
-      flex-direction: column;
-
-      * {
-        width: 100%;
-      }
-
-      button {
-        all: unset;
-        padding: 2px;
-        text-align: center;
-        background-color: lightblue;
-      }
-    }
-  }
-</style>
+{{.Number @type("int") }}

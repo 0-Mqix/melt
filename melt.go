@@ -13,6 +13,13 @@ import (
 
 /*
 TODO:
+  - pass on render save the global component calls
+   	store the channels and then after all async tasks are done
+	render the template and read the results with the global function
+  - fix error handeling
+  - fix issue with commenting html regex
+  - create a way to define data loaders for components - generate interface for that
+  - add build in hx boost in root
   - make readme with documentation
 */
 
@@ -25,8 +32,9 @@ type Furnace struct {
 	WatcherSendReloadEvent bool   //send a reload event on watcher event
 	Style                  bool   //scss in <style> -> dart sass -> localize the styles to the component
 	StyleOutputFile        string //if not empty melt will write all the styles to this file
-	OutputFile             string //if not empty melt will write a output file that is used to use your components in production
 	StylePrefix            string //the prefix of the css melt adds to the elements for localization
+	OutputFile             string //if not empty melt will write a output file that is used to use your components in production
+	GenerationOutputFile   string //if not empty melt will generate a golang file with types and functions to easly call a template with the found types
 
 	Components       map[string]*Component
 	ComponentFuncMap template.FuncMap
@@ -62,7 +70,6 @@ func New(options ...meltOption) *Furnace {
 
 	for _, option := range options {
 		option(f)
-
 	}
 
 	return f
@@ -145,6 +152,24 @@ func WithStyle(value bool, prefix string) meltOption {
 	}
 }
 
+func WithComponentFuncMap(funcs template.FuncMap) meltOption {
+	return func(f *Furnace) {
+		f.ComponentFuncMap = funcs
+	}
+}
+
+func WithRootFuncMap(funcs text.FuncMap) meltOption {
+	return func(f *Furnace) {
+		f.RootFuncMap = funcs
+	}
+}
+
+func WithGeneration(path string) meltOption {
+	return func(f *Furnace) {
+		f.GenerationOutputFile = path
+	}
+}
+
 func writeOutputFile(path string, content []byte) {
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
@@ -161,18 +186,6 @@ func writeOutputFile(path string, content []byte) {
 	}
 
 	file.Close()
-
-}
-
-func WithComponentFuncMap(funcs template.FuncMap) meltOption {
-	return func(f *Furnace) {
-		f.ComponentFuncMap = funcs
-	}
-}
-func WithRootFuncMap(funcs text.FuncMap) meltOption {
-	return func(f *Furnace) {
-		f.RootFuncMap = funcs
-	}
 }
 
 func (f *Furnace) Output() {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"net/http"
 	"os"
 
 	"golang.org/x/net/html"
@@ -19,23 +18,25 @@ type Root struct {
 	Path     string             `json:"path"`
 }
 
-func (r *Root) Write(w http.ResponseWriter, component *Component, bodyData, rootData any) {
-	body := bytes.NewBufferString("")
-	err := component.Template.Execute(body, bodyData)
-
-	var data struct {
+func (r *Root) Write(w io.Writer, data any, write func(w io.Writer)) error {
+	var templateData struct {
 		Body string
 		Data any
 	}
 
-	data.Body = body.String()
-	data.Data = rootData
+	templateData.Data = data
+
+	writer := bytes.NewBufferString("")
+	write(writer)
+	templateData.Body = writer.String()
+
+	err := r.Template.Execute(w, templateData)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
 	}
 
-	r.Template.Execute(w, data)
+	return err
 }
 
 func (f *Furnace) GetRoot(path string, force bool) (*Root, bool) {

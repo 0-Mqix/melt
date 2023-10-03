@@ -11,6 +11,10 @@ import (
 	"golang.org/x/net/html"
 )
 
+func encodeForTemplate(content string) string {
+	return "{{" + hex.EncodeToString([]byte(content)) + "}}"
+}
+
 func SplitIgnoreString(s string, sep rune) []string {
 	var result []string
 	var part string
@@ -97,7 +101,7 @@ func (f *Furnace) pasteComponent(
 			if !(value[0] == '.' || value[0] == '$') {
 				value = strings.Trim(value, "\"")
 				value = TemplateFunctionRegex.ReplaceAllStringFunc(value, func(s string) string {
-					return "{{" + hex.EncodeToString([]byte(s[2:len(s)-2])) + "}}"
+					return encodeForTemplate(s[2 : len(s)-2])
 				})
 
 				arguments[name] = Argument{Value: value, Type: ArgumentTypeConstant}
@@ -109,8 +113,7 @@ func (f *Furnace) pasteComponent(
 			arguments[name] = Argument{Value: argument, Type: ArgumentTypeVariable}
 
 			declaration := fmt.Sprintf("- %s := %s", argument, value)
-			encoded := hex.EncodeToString([]byte(declaration))
-			declarations += fmt.Sprintf("{{%s}}", encoded)
+			declarations += encodeForTemplate(declaration)
 
 			f.lastArgumentId.Add(1)
 		}
@@ -130,9 +133,7 @@ func (f *Furnace) pasteComponent(
 		}
 
 		content = replaceTemplateVariables(content, arguments)
-		content = hex.EncodeToString([]byte(content))
-
-		return "{{" + content + "}}"
+		return encodeForTemplate(content)
 	})
 
 	partialized := f.pastePartials(component.Name, argumented, partials)
@@ -220,7 +221,11 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 			})
 		}
 
-		f.pasteComponent(n, component, attributes, partials)
+		if component.global {
+			f.pasteGlobalComponent(n, component, attributes)
+		} else {
+			f.pasteComponent(n, component, attributes, partials)
+		}
 
 		if f.ComponentComments {
 			n.AppendChild(&html.Node{
@@ -262,7 +267,7 @@ func (f *Furnace) pastePartials(name, raw string, partials map[string]string) st
 			prefix := fmt.Sprintf("$%s_", name)
 			value = prefixTemplateVariables(value, "%", prefix)
 
-			return "{{" + hex.EncodeToString([]byte(value)) + "}}" + result[2]
+			return encodeForTemplate(value) + result[2]
 		})
 
 		if f.ComponentComments {
@@ -272,8 +277,8 @@ func (f *Furnace) pastePartials(name, raw string, partials map[string]string) st
 		partials[n] = s
 	}
 
-	data.Childeren = partials["Slot"]
-	delete(partials, "Slot")
+	data.Childeren = partials["slot"]
+	delete(partials, "slot")
 	data.Partials = partials
 
 	result := bytes.NewBufferString("")
@@ -284,4 +289,36 @@ func (f *Furnace) pastePartials(name, raw string, partials map[string]string) st
 	}
 
 	return result.String()
+}
+
+// give it a tag
+// tag  + path = *func
+func (f *Furnace) pasteGlobalComponent(
+	n *html.Node,
+	component *Component,
+	attributes []string,
+) {
+
+	data := fmt.Sprintf("global \"%s\" .Request @type(\"*http.Request\",\"net/http\")", component.Name)
+	for _, attribute := range attributes {
+
+		result := SplitIgnoreString(attribute, '=')
+		length := len(result)
+
+		if length > 1 {
+			name := strings.TrimSpace(result[0])
+
+			if length == 2 {
+				data += fmt.Sprintf(" \"%s\" %s", name, result[1])
+			} else if len(strings.TrimSpace(name)) != 0 {
+				data += fmt.Sprintf(" %s true", name)
+			}
+		}
+	}
+
+	n.AppendChild(&html.Node{
+		Type:      html.TextNode,
+		Data:      encodeForTemplate(data),
+		Namespace: n.Namespace,
+	})
 }

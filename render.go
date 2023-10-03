@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	componentRegex        = regexp.MustCompile(`(?m)<(?P<closing>[/-]?)(?P<name>[A-Z](?:[a-zA-Z0-9-_]?)+)(?P<attributes>(?:[^>"/]+|"[^"]*")*|)(?P<self_closing>/?)>`)
+	componentRegex        = regexp.MustCompile(`(?m)<(?P<closing>[/-]?)(?P<name>(?:[A-Z]|slot|global)(?:[a-zA-Z0-9-_]?)+)(?P<attributes>(?:[^>"/]+|"[^"]*")*|)(?P<self_closing>/?)>`)
 	TemplateFunctionRegex = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}(\n?)`)
 	CommentRegex          = regexp.MustCompile(`(?m)<!--(.*?)-->`)
 	ImportRegex           = regexp.MustCompile(`(?m)(?s)(<import>)(.+?) (.+?)(<\/import>)`)
+	TypeRegex             = regexp.MustCompile(`(?m)@type\("([^"]+)"(?:,\s?"([^"]+)")?\)`)
 
 	encoder = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz123456").WithPadding(base32.NoPadding)
 )
@@ -88,13 +89,20 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		return nil, err
 	}
 
+	global := false
+
 	/// STEP: CHANGE COMPONENT CALLS
 	var usedComponents []string
 
 	raw = componentRegex.ReplaceAllFunc(raw, func(b []byte) []byte {
 		data := componentRegex.FindStringSubmatch(string(b))
 
-		if data[2] == "Slot" {
+		if data[2] == "global" {
+			global = true
+			return []byte("")
+		}
+
+		if data[2] == "slot" {
 			return []byte("[[ .Childeren ]]")
 		}
 
@@ -161,6 +169,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		return []byte(replacement)
 	})
 
+	fmt.Printf("%s global = %v\n", name, global)
+
 	/// STEP: HIDE TEMPLATING AND PREFIX VARIABLES
 	raw = TemplateFunctionRegex.ReplaceAllFunc(raw, func(b []byte) []byte {
 		result := TemplateFunctionRegex.FindSubmatch(b)
@@ -169,8 +179,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		value := string(result[1])
 		value = prefixTemplateVariables(value, "$", prefix)
 
-		replacement := []byte("{{" + hex.EncodeToString([]byte(value)) + "}}")
-		return append(replacement, result[2]...)
+		replacement := encodeForTemplate(value)
+		return append([]byte(replacement), result[2]...)
 	})
 
 	// STEP: PARSE
@@ -252,6 +262,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		Name:     name,
 		Path:     path,
 		Style:    style,
+		global:   global,
 		Template: template.New(name).Funcs(Functions).Funcs(f.ComponentFuncMap),
 
 		defaults: defaults,
@@ -290,15 +301,20 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		return "{{" + string(value) + "}}" + result[2]
 	})
 
-	// STEP: FORMAT HTML
-	formatter.Condense = true
-	templateString = formatter.Format(templateString)
-
 	// STEP: COMMENT WORK AROUND
 	templateString = CommentRegex.ReplaceAllStringFunc(templateString, func(s string) string {
 		content := CommentRegex.FindStringSubmatch(s)
 		return fmt.Sprintf("{{comment \"%s\" }}", content[1])
 	})
+
+	//STEP: DATA TYPE GENERATION & TEMPLATE MODIFICATION
+	if f.GenerationOutputFile != "" {
+		component.generationData, templateString = extractGenerationData(templateString)
+	}
+
+	// STEP: FORMAT HTML
+	formatter.Condense = true
+	templateString = formatter.Format(templateString)
 
 	component.String = templateString
 

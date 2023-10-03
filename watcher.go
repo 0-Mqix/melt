@@ -137,6 +137,10 @@ func handleEvent(e fs.Event, f *Furnace) func() {
 		if f.WatcherSendReloadEvent {
 			f.SendReloadEvent()
 		}
+
+		if f.GenerationOutputFile != "" {
+			f.generate()
+		}
 	}
 }
 

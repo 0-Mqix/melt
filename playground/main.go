@@ -3,12 +3,16 @@ package main
 import (
 	"embed"
 	"fmt"
+	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/0-mqix/melt"
+	"github.com/0-mqix/melt/playground/data"
+	"github.com/0-mqix/melt/playground/templates"
 	"github.com/go-chi/chi/v5"
 )
+
+//go:generate go run generate.go
 
 //go:embed "melt.json"
 var build embed.FS
@@ -16,55 +20,40 @@ var build embed.FS
 func main() {
 
 	m := melt.New(
-		melt.WithAutoReloadEvent("/reload_event", true, []string{".html"}, "./"),
+		melt.WithWatcher("/reload_event", true, true, []string{".html"}, "./templates"),
 		melt.WithOutput("./melt.json", "./melt.css"),
 		melt.WithComponentComments(true),
 		melt.WithStyle(true, "melt"),
-		// melt.WithPrintRenderOutput(true),
+		melt.WithGeneration("./templates/templates.go"),
+		melt.WithPrintRenderOutput(true),
 	)
 
 	// build, _ := build.ReadFile("melt.json")
 	// m := melt.NewProduction(build)
 
-	index := m.MustGetComponent("templates/index.html")
-	root := m.MustGetRoot("templates/root.html")
+	templates.Load(m)
 
-	// m.Output()
+	root := m.MustGetRoot("./templates/root.html")
 
 	r := chi.NewRouter()
 
-	// r.Use(middleware.Logger)
+	r.Use(func(h http.Handler) http.Handler {
 
-	items := make(map[int]string)
-	id := 0
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-	r.Post("/add", func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
-
-		items[id] = r.FormValue("item")
-		id++
-
-		index.WriteTemplate(w, "items", items)
-	})
-
-	r.Delete("/delete", func(w http.ResponseWriter, r *http.Request) {
-		raw := r.URL.Query().Get("item")
-		id, _ := strconv.ParseInt(raw, 10, 0)
-
-		delete(items, int(id))
-
-		index.WriteTemplate(w, "items", items)
+		})
 	})
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 
-		var data struct {
-			Items map[int]string
+		templateData := templates.TemplatesIndexData{
+			Name:   data.Data[int]{Data: 1},
+			Number: 13,
 		}
 
-		data.Items = items
-
-		root.Write(w, index, data, "/.css")
+		root.Write(w, nil, func(w io.Writer) {
+			templates.WriteTemplatesIndex(w, templateData)
+		})
 	})
 
 	r.Get("/style.css", func(w http.ResponseWriter, r *http.Request) {

@@ -16,6 +16,5 @@ require golang.org/x/sys v0.10.0 // indirect
 
 require (
 	github.com/cli/safeexec v1.0.1 // indirect
-	github.com/go-chi/chi v1.5.4 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 )

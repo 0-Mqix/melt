@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"net/http"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +38,9 @@ type Component struct {
 
 	defaults         map[string]string `json:"-"`
 	partialsTemplate string            `json:"-"`
+	global           bool              `json:"-"`
+
+	*generationData `json:"-"`
 }
 
 func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
@@ -100,10 +103,10 @@ func (f *Furnace) AddComponent(path string, component *Component) {
 }
 
 func ComponentName(path string) string {
-	name, _ := strings.CutSuffix(filepath.Base(path), filepath.Ext(path))
+	name, _ := strings.CutSuffix(path, filepath.Ext(path))
 
 	words := strings.FieldsFunc(name, func(r rune) bool {
-		return unicode.IsSpace(r) || r == '_' || r == '-'
+		return unicode.IsSpace(r) || r == '_' || r == '-' || r == '/'
 	})
 
 	transformed := make([]string, len(words))
@@ -116,18 +119,22 @@ func ComponentName(path string) string {
 	return strings.Join(transformed, "")
 }
 
-func (c *Component) Write(w http.ResponseWriter, data any) {
+func (c *Component) Write(w io.Writer, data any) error {
 	err := c.Template.Execute(w, data)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
 	}
+
+	return err
 }
 
-func (c *Component) WriteTemplate(w http.ResponseWriter, name string, data any) {
+func (c *Component) WriteTemplate(w io.Writer, name string, data any) error {
 	err := c.Template.ExecuteTemplate(w, name, data)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
 	}
+
+	return err
 }
