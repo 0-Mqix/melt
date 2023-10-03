@@ -13,9 +13,10 @@ import (
 
 /*
 TODO:
+  - fix issue with commenting html regex
   - add value passing to global handlers
   - fix error handeling
-  - fix issue with commenting html regex
+  - scss fix %s "a, b"
   - add build in hx boost in root
   - make readme with documentation
 */
