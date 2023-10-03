@@ -151,7 +151,7 @@ func (f *Furnace) pasteComponent(
 	}
 }
 
-func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[string]*Pair) {
+func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[string]*Pair, globals map[string]bool) {
 	if n.Type == html.ElementNode && strings.Index(n.Data, "melt-") == 0 {
 
 		data := strings.Split(n.Data, "-")
@@ -211,6 +211,12 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 
 		if !ok {
 			goto Next
+
+		}
+		if component.Global {
+			f.pasteGlobalComponent(n, component, attributes)
+			globals[component.Path] = true
+			goto Next
 		}
 
 		if f.ComponentComments {
@@ -221,11 +227,7 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 			})
 		}
 
-		if component.global {
-			f.pasteGlobalComponent(n, component, attributes)
-		} else {
-			f.pasteComponent(n, component, attributes, partials)
-		}
+		f.pasteComponent(n, component, attributes, partials)
 
 		if f.ComponentComments {
 			n.AppendChild(&html.Node{
@@ -237,7 +239,7 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 	}
 Next:
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		f.useComponents(c, self, imports)
+		f.useComponents(c, self, imports, globals)
 	}
 }
 
@@ -291,30 +293,12 @@ func (f *Furnace) pastePartials(name, raw string, partials map[string]string) st
 	return result.String()
 }
 
-// give it a tag
-// tag  + path = *func
 func (f *Furnace) pasteGlobalComponent(
 	n *html.Node,
 	component *Component,
 	attributes []string,
 ) {
-
-	data := fmt.Sprintf("global \"%s\" .Request @type(\"*http.Request\",\"net/http\")", component.Name)
-	for _, attribute := range attributes {
-
-		result := SplitIgnoreString(attribute, '=')
-		length := len(result)
-
-		if length > 1 {
-			name := strings.TrimSpace(result[0])
-
-			if length == 2 {
-				data += fmt.Sprintf(" \"%s\" %s", name, result[1])
-			} else if len(strings.TrimSpace(name)) != 0 {
-				data += fmt.Sprintf(" %s true", name)
-			}
-		}
-	}
+	data := fmt.Sprintf("global \"%s\" .Request @type(\"*http.Request\",\"net/http\")", component.Path)
 
 	n.AppendChild(&html.Node{
 		Type:      html.TextNode,

@@ -13,15 +13,16 @@ import (
 
 /*
 TODO:
-  - pass on render save the global component calls
-   	store the channels and then after all async tasks are done
-	render the template and read the results with the global function
+  - add value passing to global handlers
   - fix error handeling
   - fix issue with commenting html regex
-  - create a way to define data loaders for components - generate interface for that
   - add build in hx boost in root
   - make readme with documentation
 */
+
+type contextValueKey string
+
+const GLOBALS_CONTEXT_KEY contextValueKey = "globals"
 
 type Furnace struct {
 	ComponentComments      bool   //adds comments to the html so you can see wat the source of the html is
@@ -226,5 +227,11 @@ func (f *Furnace) Output() {
 			return
 		}
 		writeOutputFile(f.OutputFile, raw)
+	}
+}
+
+func (f *Furnace) SetGlobalHandlers(handlers map[string]GlobalHandler) {
+	for path, handler := range handlers {
+		f.MustGetComponent(path).SetGlobalHandler(handler)
 	}
 }

@@ -4,43 +4,68 @@ package templates
 
 import (
 	"github.com/0-mqix/melt"
-	"io"
-
 	"github.com/0-mqix/melt/playground/data"
+	"io"
 	"net/http"
 )
 
 var (
-	TemplatesGlobal *melt.Component
-	TemplatesIndex  *melt.Component
+	Global2 *melt.Component
+	Global1 *melt.Component
+	Index   *melt.Component
 )
 
-func Load(furnace *melt.Furnace) {
-	TemplatesIndex = furnace.MustGetComponent("templates/index.html")
-	TemplatesGlobal = furnace.MustGetComponent("templates/global.html")
+type GlobalHandlers struct {
+	Global1 func(r *http.Request) *Global1Data
+	Index   func(r *http.Request) *IndexData
+	Global2 func(r *http.Request) *Global2Data
 }
 
-type TemplatesGlobalData struct {
+func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
+	Global1 = furnace.MustGetComponent("templates/global1.html")
+	Index = furnace.MustGetComponent("templates/index.html")
+	Global2 = furnace.MustGetComponent("templates/global2.html")
+
+	furnace.SetGlobalHandlers(map[string]func(r *http.Request) any{
+		"templates/global1.html": func(r *http.Request) any { return handlers.Global1(r) },
+		"templates/index.html":   func(r *http.Request) any { return handlers.Index(r) },
+		"templates/global2.html": func(r *http.Request) any { return handlers.Global2(r) },
+	})
+}
+
+type Global2Data struct {
+	Message string
+	Name    any
+}
+
+// generated write function for component
+//
+//	path: "templates/global2.html"
+func WriteGlobal2(w io.Writer, r *http.Request, data Global2Data) error {
+	return Global2.Write(w, r, data)
+}
+
+type Global1Data struct {
 	Message any
 	Name    any
 }
 
 // generated write function for component
 //
-//	path: "templates/global.html"
-func WriteTemplatesGlobal(w io.Writer, data TemplatesGlobalData) error {
-	return TemplatesGlobal.Write(w, data)
+//	path: "templates/global1.html"
+func WriteGlobal1(w io.Writer, r *http.Request, data Global1Data) error {
+	return Global1.Write(w, r, data)
 }
 
-type TemplatesIndexData struct {
-	Name    data.Data[int]
+type IndexData struct {
 	Request *http.Request
 	Number  int
+	Name    data.Data[int]
 }
 
 // generated write function for component
 //
 //	path: "templates/index.html"
-func WriteTemplatesIndex(w io.Writer, data TemplatesIndexData) error {
-	return TemplatesIndex.Write(w, data)
+func WriteIndex(w io.Writer, r *http.Request, data IndexData) error {
+	return Index.Write(w, r, data)
 }

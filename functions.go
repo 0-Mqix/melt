@@ -3,8 +3,8 @@ package melt
 import (
 	"fmt"
 	"html/template"
+	"net/http"
 	text "text/template"
-	"time"
 )
 
 var Functions = template.FuncMap{
@@ -24,19 +24,20 @@ func htmlFunction(s string) template.HTML {
 	return template.HTML(s)
 }
 
-func globalFunction(name string, vars ...any) template.HTML {
-	args := make(map[string]any)
-	for i := 0; i < len(vars)-1; i += 2 {
-		args[vars[i].(string)] = vars[i+1]
+func globalFunction(name string, r *http.Request) template.HTML {
+	globals, ok := r.Context().Value(GLOBALS_CONTEXT_KEY).(map[string]string)
+
+	if !ok {
+		fmt.Println("[MELT] gobals context value missing", name)
+		return template.HTML("")
 	}
-	fmt.Println(args)
 
-	result := make(chan template.HTML)
+	html, exists := globals[name]
 
-	go func() {
-		time.Sleep(time.Second * 1)
-		result <- template.HTML("delayed")
-	}()
+	if !exists {
+		fmt.Println("[MELT] no globals result html found for", name)
+		return template.HTML("")
+	}
 
-	return <-result
+	return template.HTML(html)
 }

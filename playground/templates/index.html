@@ -1,10 +1,30 @@
-<global />
-<import>Global global.html</import>
+<import>Global1 global1.html</import>
+<import>Global2 global2.html</import>
 
 <div>
-	hello {{ .Name @type("data.Data[int]", "github.com/0-mqix/melt/playground/data") }}!
-  <Global />
+	hello {{ .Name.Data @type("data.Data[int]","github.com/0-mqix/melt/playground/data") }}!
+	<Global1 />
+	<Global2 />
 </div>
 
-
 {{.Number @type("int") }}
+
+<style>
+	div {
+		display: flex;
+		gap: 5px;
+  }
+
+  %s .global1 { 
+    background-color: aqua;
+    border: solid black 2px;
+    border-radius: 0.75rem;
+  }
+  
+  %s .global2 {
+    background-color: aqua;
+    border: solid black 2px;
+    border-radius: 0.75rem;
+	}
+</style>
+

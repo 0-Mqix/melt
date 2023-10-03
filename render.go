@@ -169,8 +169,6 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		return []byte(replacement)
 	})
 
-	fmt.Printf("%s global = %v\n", name, global)
-
 	/// STEP: HIDE TEMPLATING AND PREFIX VARIABLES
 	raw = TemplateFunctionRegex.ReplaceAllFunc(raw, func(b []byte) []byte {
 		result := TemplateFunctionRegex.FindSubmatch(b)
@@ -262,17 +260,23 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		Name:     name,
 		Path:     path,
 		Style:    style,
-		global:   global,
+		Global:   global,
+		Globals:  make([]string, 0),
 		Template: template.New(name).Funcs(Functions).Funcs(f.ComponentFuncMap),
-
 		defaults: defaults,
+		furnace:  f,
 	}
 
 	//STEP: USE COMPONENTS
-	f.useComponents(document, component, imports)
+	globals := make(map[string]bool)
+	f.useComponents(document, component, imports, globals)
 
 	if f.Style {
 		f.addScopedMeltSelectors(name, scoped, document)
+	}
+
+	for path := range globals {
+		component.Globals = append(component.Globals, path)
 	}
 
 	//STEP: CLEAN HTML

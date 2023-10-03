@@ -2,12 +2,15 @@ package melt
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"unicode"
 )
@@ -28,7 +31,11 @@ func (f *Furnace) AddDependency(path, to string) {
 	m[to] = true
 }
 
+type GlobalHandler = func(r *http.Request) any
+
 type Component struct {
+	furnace *Furnace `json:"-"`
+
 	Template *template.Template `json:"-"`
 	String   string             `json:"template"`
 
@@ -38,9 +45,16 @@ type Component struct {
 
 	defaults         map[string]string `json:"-"`
 	partialsTemplate string            `json:"-"`
-	global           bool              `json:"-"`
+
+	Global        bool          `json:"global"`
+	Globals       []string      `json:"globals"`
+	GlobalHandler GlobalHandler `json:"-"`
 
 	*generationData `json:"-"`
+}
+
+func (c *Component) SetGlobalHandler(handler GlobalHandler) {
+	c.GlobalHandler = handler
 }
 
 func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
@@ -71,11 +85,15 @@ func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 	}
 
 	if force {
-		if _, ok := f.Components[path]; ok {
-			*f.Components[path] = *component
-		} else {
-			f.Components[path] = component
+
+		old, exists := f.Components[path]
+
+		if exists {
+			component.GlobalHandler = old.GlobalHandler
 		}
+		f.Components[path] = component
+
+		fmt.Println("add component:", component.Name, f.Components)
 	} else {
 		f.AddComponent(path, component)
 	}
@@ -116,10 +134,47 @@ func ComponentName(path string) string {
 		}
 	}
 
-	return strings.Join(transformed, "")
+	result := strings.Join(transformed, "")
+	result = strings.TrimPrefix(result, "Templates")
+
+	return result
 }
 
-func (c *Component) Write(w io.Writer, data any) error {
+func (c *Component) Write(w io.Writer, r *http.Request, data any) error {
+
+	if len(c.Globals) > 0 {
+		var wg sync.WaitGroup
+		results := make(map[string]string)
+		var mutex sync.Mutex
+
+		for _, path := range c.Globals {
+			wg.Add(1)
+
+			go func(path string) {
+
+				defer wg.Done()
+
+				buffer := bytes.NewBufferString("")
+				component, ok := c.furnace.Components[path]
+
+				if !ok || component.GlobalHandler == nil {
+					fmt.Println("[MELT component or global handler was not found")
+					return
+				}
+
+				component.Write(buffer, r, component.GlobalHandler(r))
+
+				mutex.Lock()
+				results[path] = buffer.String()
+				mutex.Unlock()
+			}(path)
+		}
+
+		wg.Wait()
+
+		*r = *r.WithContext(context.WithValue(r.Context(), GLOBALS_CONTEXT_KEY, results))
+	}
+
 	err := c.Template.Execute(w, data)
 
 	if err != nil {

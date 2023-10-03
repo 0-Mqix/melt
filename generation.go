@@ -3,6 +3,7 @@ package melt
 import (
 	"fmt"
 	"go/format"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ type generationData struct {
 
 func Generate(file string, extentions []string, paths ...string) {
 
-	m := New(WithGeneration(file), WithPrintRenderOutput(true))
+	m := New(WithGeneration(file), WithPrintRenderOutput(false))
 
 	for _, path := range paths {
 
@@ -35,6 +36,7 @@ func Generate(file string, extentions []string, paths ...string) {
 				root := name == "root" || strings.HasPrefix(name, "root_") || strings.HasPrefix(name, "root-")
 
 				if !root {
+					fmt.Println(name)
 					m.GetComponent(path, true)
 				}
 			}
@@ -85,10 +87,18 @@ func (f *Furnace) generate() {
 	dataTypes := make(map[string]string)
 	writeFuncs := make(map[string]string)
 
-	imports := ""
+	imports := "\n"
 
 	for path, component := range f.Components {
 		components[path] = component.Name
+
+		importMap := map[string]string{
+			"github.com/0-mqix/melt": "",
+			"io":                     "",
+			"net/http":               "",
+		}
+
+		maps.Copy(component.generationData.imports, importMap)
 
 		for name, path := range component.generationData.imports {
 			if path == "" {
@@ -112,17 +122,12 @@ func (f *Furnace) generate() {
 	
 	package %s
 
-	import (
-		"github.com/0-mqix/melt"
-		"io"
-		
-		%s
-	)
+	import (%s)
 	
 	`, name, imports)
 
 	code += createVariables(components) + "\n\n"
-	code += createLoad(components) + "\n\n"
+	code += createLoad(f.Components) + "\n\n"
 
 	for k, v := range dataTypes {
 		code += v + "\n\n"
@@ -153,7 +158,7 @@ func extractGenerationData(templateString string) *generationData {
 		for i, token := range tokens {
 
 			if strings.Index(token, ".") == 0 {
-
+				token := "." + strings.Split(token, ".")[1]
 				template := blocks[len(blocks)-1]
 
 				if template == "range" || template == "with" {
@@ -187,7 +192,6 @@ func extractGenerationData(templateString string) *generationData {
 				} else {
 					templates[template][token] = dataType
 				}
-
 			}
 		}
 
@@ -335,14 +339,27 @@ func createVariables(names map[string]string) string {
 	return str + ")"
 }
 
-func createLoad(components map[string]string) string {
-	str := "func Load(furnace *melt.Furnace) {\n"
+func createLoad(components map[string]*Component) string {
+	fields := ""
+	getters := ""
+	setters := ""
 
-	for path, name := range components {
-		str += fmt.Sprintf("%s = furnace.MustGetComponent(\"%s\")\n", name, path)
+	for path, c := range components {
+		getters += fmt.Sprintf("%s = furnace.MustGetComponent(\"%s\")\n", c.Name, path)
+		fields += fmt.Sprintf("%s func(r *http.Request) *%sData\n", c.Name, c.Name)
+		setters += fmt.Sprintf("\"%s\": func(r *http.Request) any {return handlers.%s(r)},\n", c.Path, c.Name)
 	}
 
-	return str + "}"
+	return fmt.Sprintf(`
+	type GlobalHandlers struct {
+		%s}	
+	
+	  func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
+		%s
+		furnace.SetGlobalHandlers(map[string]func(r *http.Request) any{
+			%s})
+	  }
+`, fields, getters, setters)
 
 }
 
@@ -351,8 +368,8 @@ func createWriteFunc(name, path string) string {
 		// generated write function for component
 		//
 		//	path: "%s"
-		func Write%s(w io.Writer, data %sData) error {
-			return %s.Write(w, data)
+		func Write%s(w io.Writer, r *http.Request, data %sData) error {
+			return %s.Write(w, r, data)
 		}
 `, path, name, name, name)
 }
