@@ -13,11 +13,17 @@ import (
 
 /*
 TODO:
+  - option for passing or over writing with GlobalOption ->
+
+  GlobalFunction(func (r *htpp.Request) any) GlobalOption
+  GlobalArguments(map[string]any) GlobalOption
+
   - fix issue with commenting html regex
-  - add value passing to global handlers
   - fix error handeling
-  - scss fix %s "a, b"
+  - improve scss
+
   - add build in hx boost in root
+
   - make readme with documentation
 */
 

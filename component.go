@@ -58,16 +58,17 @@ func (c *Component) SetGlobalHandler(handler GlobalHandler) {
 }
 
 func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
+
 	path = formatPath(path)
 
-	component, ok := f.Components[path]
+	old, ok := f.Components[path]
 
 	if ok && !force {
-		return component, true
+		return old, true
 	}
 
 	if f.productionMode {
-		return component, ok
+		return old, ok
 	}
 
 	raw, err := os.ReadFile(path)
@@ -77,7 +78,7 @@ func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 		return nil, false
 	}
 
-	component, err = f.Render(ComponentName(path), bytes.NewBuffer(raw), path)
+	component, err := f.Render(ComponentName(path), bytes.NewBuffer(raw), path)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
@@ -85,13 +86,21 @@ func (f *Furnace) GetComponent(path string, force bool) (*Component, bool) {
 	}
 
 	if force {
+		if old != nil {
+			old.Template = component.Template
+			old.String = component.String
+			old.Style = component.Style
+			old.defaults = component.defaults
+			old.partialsTemplate = component.partialsTemplate
+			old.Global = component.Global
+			old.Globals = component.Globals
+			old.generationData = component.generationData
 
-		old, exists := f.Components[path]
-
-		if exists {
-			component.GlobalHandler = old.GlobalHandler
+			component = old
+		} else {
+			f.Components[path] = component
 		}
-		f.Components[path] = component
+
 	} else {
 		f.AddComponent(path, component)
 	}
@@ -154,6 +163,9 @@ func (c *Component) Write(w io.Writer, r *http.Request, data any) error {
 
 				buffer := bytes.NewBufferString("")
 				component, ok := c.furnace.Components[path]
+
+				println("write: ", component, c.Name)
+				println("write handler: ", component.GlobalHandler)
 
 				if !ok || component.GlobalHandler == nil {
 					fmt.Println("[MELT component or global handler was not found")

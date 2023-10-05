@@ -22,7 +22,7 @@ func Global1(r *http.Request) *templates.Global1Data {
 }
 
 func Global2(r *http.Request) *templates.Global2Data {
-	return &templates.Global2Data{Name: "2", Message: "hi"}
+	return &templates.Global2Data{}
 }
 
 func main() {
@@ -30,10 +30,8 @@ func main() {
 	m := melt.New(
 		melt.WithWatcher("/reload_event", true, true, []string{".html"}, "./templates"),
 		melt.WithOutput("./melt.json", "./melt.css"),
-		melt.WithComponentComments(true),
 		melt.WithStyle(true, "melt"),
 		melt.WithGeneration("./templates/templates.go"),
-		melt.WithPrintRenderOutput(true),
 	)
 
 	// build, _ := build.ReadFile("melt.json")
@@ -41,7 +39,6 @@ func main() {
 
 	templates.Load(m, templates.GlobalHandlers{
 		Global1: Global1,
-		Global2: Global2,
 	})
 
 	root := m.MustGetRoot("./templates/root.html")

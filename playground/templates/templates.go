@@ -9,9 +9,9 @@ import (
 )
 
 var (
+	Index   *melt.Component
 	Global1 *melt.Component
 	Global2 *melt.Component
-	Index   *melt.Component
 )
 
 type GlobalHandlers struct {
@@ -25,11 +25,34 @@ func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
 	Global2 = furnace.MustGetComponent("templates/global2.html")
 	Index = furnace.MustGetComponent("templates/index.html")
 
-	furnace.SetGlobalHandlers(map[string]func(r *http.Request) any{
-		"templates/global1.html": func(r *http.Request) any { return handlers.Global1(r) },
-		"templates/global2.html": func(r *http.Request) any { return handlers.Global2(r) },
-		"templates/index.html":   func(r *http.Request) any { return handlers.Index(r) },
-	})
+	globalHandlers := make(map[string]melt.GlobalHandler)
+	var handler melt.GlobalHandler
+
+	if handlers.Global1 != nil {
+		handler = func(r *http.Request) any { return handlers.Global1(r) }
+	} else {
+		handler = func(r *http.Request) any { return &Global1Data{} }
+	}
+
+	globalHandlers["templates/global1.html"] = handler
+
+	if handlers.Global2 != nil {
+		handler = func(r *http.Request) any { return handlers.Global2(r) }
+	} else {
+		handler = func(r *http.Request) any { return &Global2Data{} }
+	}
+
+	globalHandlers["templates/global2.html"] = handler
+
+	if handlers.Index != nil {
+		handler = func(r *http.Request) any { return handlers.Index(r) }
+	} else {
+		handler = func(r *http.Request) any { return &IndexData{} }
+	}
+
+	globalHandlers["templates/index.html"] = handler
+
+	furnace.SetGlobalHandlers(globalHandlers)
 }
 
 type Global1Data struct {
@@ -44,20 +67,10 @@ func WriteGlobal1(w io.Writer, r *http.Request, data Global1Data) error {
 	return Global1.Write(w, r, data)
 }
 
-type Global2Data struct {
-	Name    any
-	Message string
-}
-
-// generated write function for component
-//
-//	path: "templates/global2.html"
-func WriteGlobal2(w io.Writer, r *http.Request, data Global2Data) error {
-	return Global2.Write(w, r, data)
-}
+type Global2Data struct{}
 
 type IndexData struct {
-	Name    any
+	Name    string
 	Request *http.Request
 	Number  int
 }
