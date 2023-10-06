@@ -1,27 +1,29 @@
+<global />
+
 <import>Global1 global1.html</import>
 <import>Global2 global2.html</import>
 
 <div>
-	hello {{ .Name @type("string") }}!
 	<Global1 />
 	<Global2 />
 </div>
 
-bruh?!
-
-{{.Number @type("int") }}
-
 <style>
 	div {
 		display: flex;
-		gap: 5px
-  }
+		gap: 5px;
 
-  %g .global { 
-    background-color: aqua;
-    border: solid black 2px;
-    border-radius: 0.75rem;
-    padding: 5px;
-  }
+		h1 {
+			background-color: green;
+		}
+	}
+
+	%g .global1,
+	)g .global2 {
+		background-color: aqua;
+		border: solid black 2px;
+		border-radius: 0.75rem;
+		padding: 5px;
+	}
+
 </style>
-

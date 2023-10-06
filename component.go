@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,7 +32,17 @@ func (f *Furnace) AddDependency(path, to string) {
 	m[to] = true
 }
 
-type GlobalHandler = func(r *http.Request) any
+type GlobalHandler = func(r *http.Request, arguments map[string]any) any
+
+type GlobalOption any
+
+func GlobalFunction(path string, handler GlobalHandler) GlobalOption {
+	return []any{formatPath(path), handler}
+}
+
+func GlobalArguments(arguments map[string]any) GlobalOption {
+	return arguments
+}
 
 type Component struct {
 	furnace *Furnace `json:"-"`
@@ -147,12 +158,30 @@ func ComponentName(path string) string {
 	return result
 }
 
-func (c *Component) Write(w io.Writer, r *http.Request, data any) error {
+func (c *Component) Write(w io.Writer, r *http.Request, data any, globalOptions ...GlobalOption) error {
 
 	if len(c.Globals) > 0 {
 		var wg sync.WaitGroup
-		results := make(map[string]string)
 		var mutex sync.Mutex
+
+		results := make(map[string]string)
+		handlers := make(map[string]GlobalHandler)
+		arguments := make(map[string]any)
+
+		for _, option := range globalOptions {
+			switch data := option.(type) {
+
+			case []any:
+				handlers[data[0].(string)] = data[1].(GlobalHandler)
+
+			case map[string]any:
+				if data == nil {
+					arguments = data
+				} else {
+					maps.Copy(arguments, data)
+				}
+			}
+		}
 
 		for _, path := range c.Globals {
 			wg.Add(1)
@@ -161,18 +190,26 @@ func (c *Component) Write(w io.Writer, r *http.Request, data any) error {
 
 				defer wg.Done()
 
-				buffer := bytes.NewBufferString("")
 				component, ok := c.furnace.Components[path]
 
-				println("write: ", component, c.Name)
-				println("write handler: ", component.GlobalHandler)
-
-				if !ok || component.GlobalHandler == nil {
-					fmt.Println("[MELT component or global handler was not found")
+				if !ok {
+					fmt.Println("[MELT] [WRITE] component was not found for", path)
 					return
 				}
 
-				component.Write(buffer, r, component.GlobalHandler(r))
+				handler := component.GlobalHandler
+
+				if overwrite, ok := handlers[path]; ok {
+					handler = overwrite
+				}
+
+				if handler == nil {
+					fmt.Println("[MELT] [WRITE] no global handler defined for", path)
+					return
+				}
+
+				buffer := bytes.NewBufferString("")
+				component.Write(buffer, r, handler(r, arguments))
 
 				mutex.Lock()
 				results[path] = buffer.String()

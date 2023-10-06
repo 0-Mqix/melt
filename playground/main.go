@@ -17,12 +17,11 @@ import (
 //go:embed "melt.json"
 var build embed.FS
 
-func Global1(r *http.Request) *templates.Global1Data {
+func Global1(r *http.Request, _ map[string]any) *templates.Global1Data {
 	return &templates.Global1Data{Name: "1", Message: "hi"}
 }
-
-func Global2(r *http.Request) *templates.Global2Data {
-	return &templates.Global2Data{}
+func Global2(r *http.Request, arguments map[string]any) *templates.Global2Data {
+	return &templates.Global2Data{Data: arguments["name"]}
 }
 
 func main() {
@@ -39,6 +38,7 @@ func main() {
 
 	templates.Load(m, templates.GlobalHandlers{
 		Global1: Global1,
+		Global2: Global2,
 	})
 
 	root := m.MustGetRoot("./templates/root.html")
@@ -50,13 +50,15 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 
 		templateData := templates.IndexData{
-			Name:    "Max",
-			Number:  13,
 			Request: r,
 		}
 
+		arguments := melt.GlobalArguments(map[string]any{
+			"name": "stan",
+		})
+
 		root.Write(w, nil, func(w io.Writer) {
-			templates.WriteIndex(w, r, templateData)
+			templates.WriteIndex(w, r, templateData, arguments)
 		})
 	})
 

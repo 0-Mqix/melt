@@ -136,7 +136,6 @@ func (f *Furnace) generate() {
 	if err == nil {
 		writeOutputFile(f.GenerationOutputFile, bytes)
 	} else {
-		writeOutputFile("./debug", []byte(code))
 		fmt.Println("[MELT] mqix is monkey:", err)
 	}
 }
@@ -246,11 +245,13 @@ func createWriteFuncs(name, path string, data *generationData) map[string]string
 
 	for template := range data.templates {
 		if template == "" {
-			result[name] = createWriteFunc(name, path)
+			continue
 		} else {
 			result[name+ComponentName(strings.Trim(template, "\""))] = createWriteTemplateFunc(name, path, template)
 		}
 	}
+
+	result[name] = createWriteFunc(name, path)
 
 	return result
 }
@@ -292,7 +293,7 @@ func createTypes(name, path string, data *generationData) map[string]string {
 	}
 
 	if len(data.templates) == 0 {
-		result[name+"Data"] = fmt.Sprintf("type %sData struct{}", name)
+		result[name] = fmt.Sprintf("type %sData struct{}", name)
 	}
 
 	return result
@@ -346,12 +347,17 @@ func createLoad(components map[string]*Component) string {
 
 	for path, c := range components {
 		getters += fmt.Sprintf("%s = furnace.MustGetComponent(\"%s\")\n", c.Name, path)
-		fields += fmt.Sprintf("%s func(r *http.Request) *%sData\n", c.Name, c.Name)
+
+		if !c.Global {
+			continue
+		}
+
+		fields += fmt.Sprintf("%s func(r *http.Request, arguments map[string]any) *%sData\n", c.Name, c.Name)
 		setters += fmt.Sprintf(`
 		if handlers.%s != nil {
-			handler = func(r *http.Request) any { return handlers.%s(r) } 
+			handler = func(r *http.Request, arguments map[string]any) any { return handlers.%s(r, arguments) } 
 		} else {
-			handler = func(r *http.Request) any { return &%sData{} } 
+			handler = func(r *http.Request, _ map[string]any) any { return &%sData{} } 
 		}
 
 		globalHandlers["%s"] = handler
@@ -379,8 +385,8 @@ func createWriteFunc(name, path string) string {
 		// generated write function for component
 		//
 		//	path: "%s"
-		func Write%s(w io.Writer, r *http.Request, data %sData) error {
-			return %s.Write(w, r, data)
+		func Write%s(w io.Writer, r *http.Request, data %sData, globalOptions ...melt.GlobalOption) error {
+			return %s.Write(w, r, data, globalOptions...)
 		}
 `, path, name, name, name)
 }

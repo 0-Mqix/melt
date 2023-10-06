@@ -9,48 +9,59 @@ import (
 )
 
 var (
-	Index   *melt.Component
 	Global1 *melt.Component
 	Global2 *melt.Component
+	Index   *melt.Component
+	Global3 *melt.Component
 )
 
 type GlobalHandlers struct {
-	Global1 func(r *http.Request) *Global1Data
-	Global2 func(r *http.Request) *Global2Data
-	Index   func(r *http.Request) *IndexData
+	Global2 func(r *http.Request, arguments map[string]any) *Global2Data
+	Index   func(r *http.Request, arguments map[string]any) *IndexData
+	Global3 func(r *http.Request, arguments map[string]any) *Global3Data
+	Global1 func(r *http.Request, arguments map[string]any) *Global1Data
 }
 
 func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
-	Global1 = furnace.MustGetComponent("templates/global1.html")
 	Global2 = furnace.MustGetComponent("templates/global2.html")
 	Index = furnace.MustGetComponent("templates/index.html")
+	Global3 = furnace.MustGetComponent("templates/global3.html")
+	Global1 = furnace.MustGetComponent("templates/global1.html")
 
 	globalHandlers := make(map[string]melt.GlobalHandler)
 	var handler melt.GlobalHandler
 
-	if handlers.Global1 != nil {
-		handler = func(r *http.Request) any { return handlers.Global1(r) }
-	} else {
-		handler = func(r *http.Request) any { return &Global1Data{} }
-	}
-
-	globalHandlers["templates/global1.html"] = handler
-
 	if handlers.Global2 != nil {
-		handler = func(r *http.Request) any { return handlers.Global2(r) }
+		handler = func(r *http.Request, arguments map[string]any) any { return handlers.Global2(r, arguments) }
 	} else {
-		handler = func(r *http.Request) any { return &Global2Data{} }
+		handler = func(r *http.Request, _ map[string]any) any { return &Global2Data{} }
 	}
 
 	globalHandlers["templates/global2.html"] = handler
 
 	if handlers.Index != nil {
-		handler = func(r *http.Request) any { return handlers.Index(r) }
+		handler = func(r *http.Request, arguments map[string]any) any { return handlers.Index(r, arguments) }
 	} else {
-		handler = func(r *http.Request) any { return &IndexData{} }
+		handler = func(r *http.Request, _ map[string]any) any { return &IndexData{} }
 	}
 
 	globalHandlers["templates/index.html"] = handler
+
+	if handlers.Global3 != nil {
+		handler = func(r *http.Request, arguments map[string]any) any { return handlers.Global3(r, arguments) }
+	} else {
+		handler = func(r *http.Request, _ map[string]any) any { return &Global3Data{} }
+	}
+
+	globalHandlers["templates/global3.html"] = handler
+
+	if handlers.Global1 != nil {
+		handler = func(r *http.Request, arguments map[string]any) any { return handlers.Global1(r, arguments) }
+	} else {
+		handler = func(r *http.Request, _ map[string]any) any { return &Global1Data{} }
+	}
+
+	globalHandlers["templates/global1.html"] = handler
 
 	furnace.SetGlobalHandlers(globalHandlers)
 }
@@ -63,21 +74,37 @@ type Global1Data struct {
 // generated write function for component
 //
 //	path: "templates/global1.html"
-func WriteGlobal1(w io.Writer, r *http.Request, data Global1Data) error {
-	return Global1.Write(w, r, data)
+func WriteGlobal1(w io.Writer, r *http.Request, data Global1Data, globalOptions ...melt.GlobalOption) error {
+	return Global1.Write(w, r, data, globalOptions...)
 }
 
-type Global2Data struct{}
+type Global2Data struct {
+	Data any
+}
+
+// generated write function for component
+//
+//	path: "templates/global2.html"
+func WriteGlobal2(w io.Writer, r *http.Request, data Global2Data, globalOptions ...melt.GlobalOption) error {
+	return Global2.Write(w, r, data, globalOptions...)
+}
 
 type IndexData struct {
-	Name    string
 	Request *http.Request
-	Number  int
 }
 
 // generated write function for component
 //
 //	path: "templates/index.html"
-func WriteIndex(w io.Writer, r *http.Request, data IndexData) error {
-	return Index.Write(w, r, data)
+func WriteIndex(w io.Writer, r *http.Request, data IndexData, globalOptions ...melt.GlobalOption) error {
+	return Index.Write(w, r, data, globalOptions...)
+}
+
+type Global3Data struct{}
+
+// generated write function for component
+//
+//	path: "templates/global3.html"
+func WriteGlobal3(w io.Writer, r *http.Request, data Global3Data, globalOptions ...melt.GlobalOption) error {
+	return Global3.Write(w, r, data, globalOptions...)
 }

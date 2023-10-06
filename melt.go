@@ -11,19 +11,15 @@ import (
 	text "text/template"
 )
 
+/* \
+NOTE:
+	- %s does ofcouse not work for global components
+*/
+
 /*
 TODO:
-  - option for passing or over writing with GlobalOption ->
-
-  GlobalFunction(func (r *htpp.Request) any) GlobalOption
-  GlobalArguments(map[string]any) GlobalOption
-
-  - fix issue with commenting html regex
-  - fix error handeling
-  - improve scss
-
+  - improve error handeling
   - add build in hx boost in root
-
   - make readme with documentation
 */
 

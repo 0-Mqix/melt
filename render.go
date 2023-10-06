@@ -18,7 +18,7 @@ import (
 var (
 	componentRegex        = regexp.MustCompile(`(?m)<(?P<closing>[/-]?)(?P<name>(?:[A-Z]|slot|global)(?:[a-zA-Z0-9-_]?)+)(?P<attributes>(?:[^>"/]+|"[^"]*")*|)(?P<self_closing>/?)>`)
 	TemplateFunctionRegex = regexp.MustCompile(`(?m){{\s*([^{}]+?)\s*?}}(\n?)`)
-	CommentRegex          = regexp.MustCompile(`(?m)<!--(.*?)-->`)
+	CommentRegex          = regexp.MustCompile(`(?ms)<!--(.*?)-->`)
 	ImportRegex           = regexp.MustCompile(`(?m)(?s)(<import>)(.+?) (.+?)(<\/import>)`)
 	TypeRegex             = regexp.MustCompile(`(?m)@type\("([^"]+)"(?:,\s?"([^"]+)")?\)`)
 
@@ -93,6 +93,9 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 	/// STEP: CHANGE COMPONENT CALLS
 	var usedComponents []string
+
+	/// STEP: REMOVE ALL COMMENTS D BECAUSE REGEX SKILL ISSUE
+	raw = CommentRegex.ReplaceAll(raw, []byte{})
 
 	raw = componentRegex.ReplaceAllFunc(raw, func(b []byte) []byte {
 		data := componentRegex.FindStringSubmatch(string(b))
@@ -256,7 +259,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	var scoped []string
 
 	if f.Style {
-		style, scoped, _ = f.style(name, style, document)
+		style, scoped, _ = f.style(path, name, style, document)
 	}
 
 	//STEP: CREATE RESULT
@@ -276,7 +279,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	f.useComponents(document, component, imports, globals)
 
 	if f.Style {
-		f.addScopedMeltSelectors(name, scoped, document)
+		f.addScopedMeltSelectors(path, name, scoped, document)
 	}
 
 	for path := range globals {

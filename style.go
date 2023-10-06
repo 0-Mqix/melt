@@ -21,6 +21,13 @@ const (
 	MELT_INTERNAL_SCOPED_PREFIX = "#MELT-INTERNAL-SCOPED"
 )
 
+func styleError(path string, message any) {
+	fmt.Printf("[MELT] [SCSS] %v\n", strings.ReplaceAll(
+		fmt.Sprint(message), "file: \".\"",
+		fmt.Sprintf("file: \"%s\"", path),
+	))
+}
+
 func (f *Furnace) sortStyles(styles string) string {
 
 	var scopedStyles string
@@ -67,11 +74,11 @@ func (f *Furnace) sortStyles(styles string) string {
 	return styles + scopedStyles + globalStyles
 }
 
-func (f *Furnace) style(component, styles string, document *html.Node) (string, []string, error) {
+func (f *Furnace) style(path, component, styles string, document *html.Node) (string, []string, error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("[MELT] [SCSS]", r)
+			styleError(path, r)
 		}
 	}()
 
@@ -81,29 +88,35 @@ func (f *Furnace) style(component, styles string, document *html.Node) (string, 
 	//STEP: PREPARE SCSS FOR % GLOBAL
 	styles = styleSelectorRegex.ReplaceAllStringFunc(styles, func(s string) string {
 		result := styleSelectorRegex.FindStringSubmatch(s)
+		selectors := make([]string, 0)
 
-		selector := strings.TrimLeftFunc(result[1], func(r rune) bool {
-			return unicode.IsSpace(r)
-		})
+		for _, selector := range strings.Split(result[1], ",") {
 
-		if strings.Index(selector, "%g") == 0 {
-			selector = MELT_INTERNAL_GLOBAL_PREFIX + selector[2:]
+			selector = strings.TrimLeftFunc(selector, func(r rune) bool {
+				return unicode.IsSpace(r)
+			})
+
+			if strings.Index(selector, "%g") == 0 {
+				selectors = append(selectors, MELT_INTERNAL_GLOBAL_PREFIX+selector[2:])
+
+			} else if strings.Index(selector, "%s") == 0 {
+				selectors = append(selectors, MELT_INTERNAL_SCOPED_PREFIX+selector[2:])
+
+			} else {
+				selectors = append(selectors, selector)
+			}
 		}
 
-		if strings.Index(selector, "%s") == 0 {
-			selector = MELT_INTERNAL_SCOPED_PREFIX + selector[2:]
-		}
-
-		return selector + result[2]
+		return strings.Join(selectors, ",") + result[2]
 	})
 
 	// STEP: TRANSPILE SCSS WITH DART SASS
 	transpiler, err := sass.Start(sass.Options{LogEventHandler: func(e sass.LogEvent) {
-		fmt.Printf("[MELT] [SCSS] %v\n", e)
+		styleError(path, e.Message)
 	}})
 
 	if err != nil {
-		fmt.Printf("[MELT] [SCSS] %v\n", err)
+		styleError(path, err)
 		return "", scopedSelectors, err
 	}
 
@@ -134,38 +147,41 @@ func (f *Furnace) style(component, styles string, document *html.Node) (string, 
 	}
 
 	styles = ""
-	for name, rules := range selectors {
+	for selector, rules := range selectors {
+		for _, name := range strings.Split(selector, ",") {
 
-		name, global := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
+			name, global := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
 
-		if global {
-			styles += name + rules
-			continue
+			if global {
+				styles += name + rules
+				continue
+			}
+
+			name, scoped := strings.CutPrefix(name, MELT_INTERNAL_SCOPED_PREFIX)
+
+			selector, err := css.Parse(name)
+
+			if err != nil {
+				styleError(path, err)
+				continue
+			}
+
+			results := selector.Select(document)
+
+			if len(results) == 0 && !scoped {
+				continue
+			}
+
+			if scoped {
+				styles += name + "." + f.StylePrefix + "-scoped-" + component + rules
+				scopedSelectors = append(scopedSelectors, name)
+			} else {
+				styles += name + "." + styleId + rules
+			}
+
+			f.addMeltSelectors(results, styleId)
 		}
 
-		name, scoped := strings.CutPrefix(name, MELT_INTERNAL_SCOPED_PREFIX)
-
-		selector, err := css.Parse(name)
-
-		if err != nil {
-			fmt.Println("[MELT] [SCSS]", err)
-			continue
-		}
-
-		results := selector.Select(document)
-
-		if len(results) == 0 && !scoped {
-			continue
-		}
-
-		if scoped {
-			styles += name + "." + f.StylePrefix + "-scoped-" + component + rules
-			scopedSelectors = append(scopedSelectors, name)
-		} else {
-			styles += name + "." + styleId + rules
-		}
-
-		f.addMeltSelectors(results, styleId)
 	}
 
 	return styles, scopedSelectors, nil
@@ -218,13 +234,13 @@ func (f *Furnace) addMeltSelectors(elements []*html.Node, styleId string) {
 	}
 }
 
-func (f *Furnace) addScopedMeltSelectors(component string, scoped []string, document *html.Node) error {
+func (f *Furnace) addScopedMeltSelectors(path, component string, scoped []string, document *html.Node) error {
 	for _, name := range scoped {
 
 		selector, err := css.Parse(name)
 
 		if err != nil {
-			fmt.Println("[MELT] [SCSS]", err)
+			styleError(path, err)
 			continue
 		}
 
