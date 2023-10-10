@@ -18,6 +18,7 @@ NOTE:
 
 /*
 TODO:
+  - create a template project with lit
   - improve error handeling
   - add build in hx boost in root
   - make readme with documentation

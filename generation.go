@@ -364,6 +364,12 @@ func createLoad(components map[string]*Component) string {
  		`, c.Name, c.Name, c.Name, path)
 	}
 
+	var handler string
+
+	if setters != "" {
+		handler = "var handler melt.GlobalHandler\n"
+	}
+
 	return fmt.Sprintf(`
 	type GlobalHandlers struct {
 		%s}	
@@ -371,12 +377,12 @@ func createLoad(components map[string]*Component) string {
 	  func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
 		%s
 		globalHandlers := make(map[string]melt.GlobalHandler)
-		var handler melt.GlobalHandler
+		%s
 		%s
 
 		furnace.SetGlobalHandlers(globalHandlers)
 	  }
-`, fields, getters, setters)
+`, fields, getters, handler, setters)
 
 }
 

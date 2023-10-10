@@ -25,7 +25,6 @@ func Global2(r *http.Request, arguments map[string]any) *templates.Global2Data {
 }
 
 func main() {
-
 	m := melt.New(
 		melt.WithWatcher("/reload_event", true, true, []string{".html"}, "./templates"),
 		melt.WithOutput("./melt.json", "./melt.css"),
