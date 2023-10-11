@@ -14,9 +14,7 @@ import (
 /* \
 NOTE:
 	- %s does ofcouse not work for global components
-*/
 
-/*
 TODO:
   - create a template project with lit
   - improve error handeling
@@ -37,6 +35,7 @@ type Furnace struct {
 	WatcherSendReloadEvent bool   //send a reload event on watcher event
 	Style                  bool   //scss in <style> -> dart sass -> localize the styles to the component
 	StyleOutputFile        string //if not empty melt will write all the styles to this file
+	StyleInputFile         string //if not empty melt will use this file as an main scss file
 	StylePrefix            string //the prefix of the css melt adds to the elements for localization
 	OutputFile             string //if not empty melt will write a output file that is used to use your components in production
 	GenerationOutputFile   string //if not empty melt will generate a golang file with types and functions to easly call a template with the found types
@@ -143,17 +142,27 @@ func WithWatcher(reloadEventUrl string, autoUpdateImports, watcherSendReloadEven
 	}
 }
 
-func WithOutput(outputFile, styleOutputFile string) meltOption {
+func WithOutput(outputFile string) meltOption {
 	return func(f *Furnace) {
-		f.StyleOutputFile = formatPath(styleOutputFile)
-		f.OutputFile = formatPath(outputFile)
+		if outputFile != "" {
+			f.OutputFile = formatPath(outputFile)
+		}
 	}
 }
 
-func WithStyle(value bool, prefix string) meltOption {
+func WithStyle(value bool, prefix, inputPath, outputPath string) meltOption {
 	return func(f *Furnace) {
 		f.Style = value
 		f.StylePrefix = prefix
+
+		if inputPath != "" {
+			f.StyleInputFile = formatPath(inputPath)
+		}
+
+		if outputPath != "" {
+			f.StyleOutputFile = formatPath(outputPath)
+		}
+
 	}
 }
 
@@ -193,17 +202,27 @@ func writeOutputFile(path string, content []byte) {
 	file.Close()
 }
 
-func (f *Furnace) Output() {
-	f.Styles = ""
-
-	for _, c := range f.Components {
-		f.Styles += c.Style
+func (f *Furnace) SetGlobalHandlers(handlers map[string]GlobalHandler) {
+	for path, handler := range handlers {
+		f.MustGetComponent(path).SetGlobalHandler(handler)
 	}
+}
 
-	f.Styles = f.sortStyles(f.Styles)
+func (f *Furnace) Output() {
 
-	if f.StyleOutputFile != "" {
-		writeOutputFile(f.StyleOutputFile, []byte(f.Styles))
+	if f.Style {
+		fmt.Println("[MELT] updating: styles")
+		f.Styles = ""
+
+		for _, c := range f.Components {
+			f.Styles += c.Style
+		}
+
+		f.Styles = f.transpileStyleFiles() + f.sortStyles(f.Styles)
+
+		if f.StyleOutputFile != "" {
+			writeOutputFile(f.StyleOutputFile, []byte(f.Styles))
+		}
 	}
 
 	if f.OutputFile != "" {
@@ -231,11 +250,5 @@ func (f *Furnace) Output() {
 			return
 		}
 		writeOutputFile(f.OutputFile, raw)
-	}
-}
-
-func (f *Furnace) SetGlobalHandlers(handlers map[string]GlobalHandler) {
-	for path, handler := range handlers {
-		f.MustGetComponent(path).SetGlobalHandler(handler)
 	}
 }

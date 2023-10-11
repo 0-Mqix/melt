@@ -31,6 +31,11 @@ type Pair struct {
 }
 
 func formatPath(path string) string {
+
+	if path == "" {
+		return path
+	}
+
 	path = strings.ToLower(path)
 	path = filepath.Clean(path)
 	path = filepath.ToSlash(path)

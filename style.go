@@ -2,6 +2,8 @@ package melt
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -249,4 +251,81 @@ func (f *Furnace) addScopedMeltSelectors(path, component string, scoped []string
 	}
 
 	return nil
+}
+
+func (f *Furnace) transpileStyleFiles() string {
+
+	if f.StyleInputFile == "" {
+		return ""
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(r)
+		}
+	}()
+
+	// STEP: TRANSPILE SCSS WITH DART SASS
+	transpiler, err := sass.Start(sass.Options{LogEventHandler: func(e sass.LogEvent) {
+		fmt.Println(e.Message)
+	}})
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	content, err := os.ReadFile(f.StyleInputFile)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	result, err := transpiler.Execute(sass.Args{
+		Source:         string(content),
+		SourceSyntax:   sass.SourceSyntaxSCSS,
+		OutputStyle:    sass.OutputStyleCompressed,
+		ImportResolver: resolver(f.StyleInputFile),
+	})
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return result.CSS
+}
+
+func resolver(inputFile string) *fileResolver {
+	working, _ := os.Getwd()
+	local := filepath.Dir(inputFile)
+	return &fileResolver{start: filepath.Join(working, local)}
+}
+
+type fileResolver struct {
+	start string
+}
+
+func (r fileResolver) CanonicalizeURL(path string) (string, error) {
+
+	if strings.Index(path, "file:///") != 0 {
+		path = filepath.Join(r.start, path)
+		return "file:///" + path, nil
+	}
+
+	return path, nil
+}
+
+func (r fileResolver) Load(path string) (sass.Import, error) {
+
+	content, err := os.ReadFile(formatPath(strings.TrimPrefix(path, "file:///")))
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+		return sass.Import{}, err
+	}
+
+	return sass.Import{
+		Content:      string(content),
+		SourceSyntax: sass.SourceSyntaxSCSS,
+	}, nil
 }

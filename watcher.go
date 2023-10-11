@@ -27,7 +27,7 @@ var (
 	}
 )
 
-const DELAY = time.Duration(50 * time.Millisecond)
+const FILE_EVENT_DELAY = time.Duration(50 * time.Millisecond)
 
 func hasExtention(path string, extentions []string) bool {
 	extention := filepath.Ext(path)
@@ -63,7 +63,20 @@ func (f *Furnace) updateDependencies(path string) {
 	}
 }
 
-func handleEvent(e fs.Event, f *Furnace) func() {
+func handleStyleFileEvent(f *Furnace) func() {
+	return func() {
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		f.Output()
+
+		if f.WatcherSendReloadEvent {
+			f.SendReloadEvent()
+		}
+	}
+}
+
+func handleMeltFileEvent(e fs.Event, f *Furnace) func() {
 	return func() {
 
 		mutex.Lock()
@@ -169,7 +182,6 @@ func (f *Furnace) StartWatcher(extentions []string, paths ...string) {
 				}
 
 				path := formatPath(e.Name)
-
 				if !hasExtention(path, extentions) || path == f.StyleOutputFile || path == f.OutputFile {
 					continue
 				}
@@ -178,9 +190,14 @@ func (f *Furnace) StartWatcher(extentions []string, paths ...string) {
 				timer, ok := updates[event]
 
 				if !ok {
-					updates[event] = time.AfterFunc(DELAY, handleEvent(e, f))
+					if filepath.Ext(e.Name) == ".scss" && f.Style {
+						updates[event] = time.AfterFunc(FILE_EVENT_DELAY, handleStyleFileEvent(f))
+					} else {
+						updates[event] = time.AfterFunc(FILE_EVENT_DELAY, handleMeltFileEvent(e, f))
+					}
+
 				} else {
-					timer.Reset(DELAY)
+					timer.Reset(FILE_EVENT_DELAY)
 				}
 
 			case err, ok := <-watcher.Errors:
