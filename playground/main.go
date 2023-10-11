@@ -25,15 +25,15 @@ func Global2(r *http.Request, arguments map[string]any) *templates.Global2Data {
 }
 
 func main() {
-	m := melt.New(
-		melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates"),
-		melt.WithOutput("./melt.json"),
-		melt.WithStyle(true, "melt", "./templates/main.scss", ""),
-		melt.WithGeneration("./templates/templates.go"),
-	)
+	// m := melt.New(
+	// 	melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates"),
+	// 	melt.WithOutput("./melt.json"),
+	// 	melt.WithStyle(true, "melt", "./templates/main.scss", ""),
+	// 	melt.WithGeneration("./templates/templates.go"),
+	// )
 
-	// build, _ := build.ReadFile("melt.json")
-	// m := melt.NewProduction(build)
+	build, _ := build.ReadFile("melt.json")
+	m := melt.NewProduction(build)
 
 	templates.Load(m, templates.GlobalHandlers{
 		Global1: Global1,

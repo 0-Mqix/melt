@@ -59,6 +59,7 @@ type Furnace struct {
 type Build struct {
 	Components []*Component `json:"components"`
 	Roots      []*Root      `json:"roots"`
+	FileStyles string       `json:"file_styles"`
 }
 
 type meltOption func(*Furnace)
@@ -100,9 +101,10 @@ func NewProduction(input []byte) *Furnace {
 		if err != nil {
 			panic("[MELT] invalid input at component from " + c.Path)
 		}
-
+		c.furnace = f
 		f.Components[c.Path] = c
 		f.Styles += c.Style
+		f.Styles = build.FileStyles + f.Styles
 	}
 
 	for _, r := range build.Roots {
@@ -185,17 +187,17 @@ func WithGeneration(path string) meltOption {
 }
 
 func writeOutputFile(path string, content []byte) {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 
 	if err != nil {
-		fmt.Println("[MELT] [BUILD]", err)
+		fmt.Println("[MELT] [OUTPUT]", err)
 		return
 	}
 
 	_, err = file.Write(content)
 
 	if err != nil {
-		fmt.Println("[MELT] [BUILD]", err)
+		fmt.Println("[MELT] [OUTPUT]", err)
 		return
 	}
 
@@ -209,6 +211,7 @@ func (f *Furnace) SetGlobalHandlers(handlers map[string]GlobalHandler) {
 }
 
 func (f *Furnace) Output() {
+	var fileStyles string
 
 	if f.Style {
 		fmt.Println("[MELT] updating: styles")
@@ -218,7 +221,8 @@ func (f *Furnace) Output() {
 			f.Styles += c.Style
 		}
 
-		f.Styles = f.transpileStyleFiles() + f.sortStyles(f.Styles)
+		fileStyles = f.transpileStyleFiles()
+		f.Styles = fileStyles + f.sortStyles(f.Styles)
 
 		if f.StyleOutputFile != "" {
 			writeOutputFile(f.StyleOutputFile, []byte(f.Styles))
@@ -226,7 +230,14 @@ func (f *Furnace) Output() {
 	}
 
 	if f.OutputFile != "" {
+		if f.productionMode {
+			fmt.Println("[MELT] output is currently not suported in production mode")
+			return
+		}
+
 		var output Build
+
+		output.FileStyles = fileStyles
 
 		for _, c := range f.Components {
 			output.Components = append(output.Components, c)
@@ -236,7 +247,7 @@ func (f *Furnace) Output() {
 			raw, err := os.ReadFile(path)
 
 			if err != nil {
-				fmt.Println("[MELT]", err)
+				fmt.Println("[MELT] [BUILD]", err)
 				continue
 			}
 
@@ -249,6 +260,7 @@ func (f *Furnace) Output() {
 			fmt.Println("[MELT] [BUILD]", err)
 			return
 		}
+
 		writeOutputFile(f.OutputFile, raw)
 	}
 }
