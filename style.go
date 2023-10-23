@@ -16,6 +16,7 @@ import (
 var (
 	styleSelectorRegex = regexp.MustCompile(`(?m)(?s)([^{}]+)\s*({.+?})`)
 	styleCommentRegex  = regexp.MustCompile(`(?m)(?s)\/\*.+?\*\/`)
+	queryRegex         = regexp.MustCompile(`(?m)(?s)(@[^{]+)({([^{]+{.*})*\s*})`)
 )
 
 const (
@@ -34,6 +35,12 @@ func (f *Furnace) sortStyles(styles string) string {
 
 	var scopedStyles string
 	var globalStyles string
+	var queryStyles string
+
+	styles = queryRegex.ReplaceAllStringFunc(styles, func(s string) string {
+		queryStyles += s
+		return ""
+	})
 
 	styles = styleSelectorRegex.ReplaceAllStringFunc(styles, func(s string) string {
 		result := styleSelectorRegex.FindStringSubmatch(s)
@@ -73,7 +80,7 @@ func (f *Furnace) sortStyles(styles string) string {
 		return ""
 	})
 
-	return styles + scopedStyles + globalStyles
+	return styles + scopedStyles + globalStyles + queryStyles
 }
 
 func (f *Furnace) style(path, component, styles string, document *html.Node) (string, []string, error) {
@@ -138,9 +145,27 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 	styleId := f.StylePrefix + "-" + component
 	selectors := make(map[string]string)
 
-	foundStyles := styleSelectorRegex.FindAllStringSubmatch(styleResult.CSS, -1)
+	style := queryRegex.ReplaceAllStringFunc(styleResult.CSS, func(s string) string {
+		selector := queryRegex.FindStringSubmatch(s)
+		querySelectors := make(map[string]string)
 
-	for _, style := range foundStyles {
+		for _, style := range styleSelectorRegex.FindAllStringSubmatch(selector[3], -1) {
+			if len(style) != 3 {
+				continue
+			}
+
+			querySelectors[style[1]] = style[2]
+		}
+
+		modified, scoped := f.ModifySelectors(path, component, styleId, document, querySelectors)
+		scopedSelectors = append(scopedSelectors, scoped...)
+
+		selectors[selector[1]] = "{" + modified + "}"
+
+		return ""
+	})
+
+	for _, style := range styleSelectorRegex.FindAllStringSubmatch(style, -1) {
 		if len(style) != 3 {
 			continue
 		}
@@ -148,9 +173,27 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 		selectors[style[1]] = style[2]
 	}
 
-	styles = ""
+	styles, scoped := f.ModifySelectors(path, component, styleId, document, selectors)
+	scopedSelectors = append(scopedSelectors, scoped...)
+
+	return styles, scopedSelectors, nil
+}
+
+func (f *Furnace) ModifySelectors(
+	path, component, styleId string,
+	document *html.Node,
+	selectors map[string]string,
+) (string, []string) {
+	var scopedSelectors []string
+	var styles string
+
 	for selector, rules := range selectors {
 		for _, name := range strings.Split(selector, ",") {
+
+			if strings.Index(name, "@") == 0 {
+				styles += name + rules
+				continue
+			}
 
 			name, global := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
 
@@ -183,14 +226,12 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 
 			f.addMeltSelectors(results, styleId)
 		}
-
 	}
 
-	return styles, scopedSelectors, nil
+	return styles, scopedSelectors
 }
 
 func (f *Furnace) addMeltSelectors(elements []*html.Node, styleId string) {
-
 	for _, n := range elements {
 		if strings.Index(n.Data, "melt-") == 0 {
 			continue

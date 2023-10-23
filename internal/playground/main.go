@@ -7,9 +7,8 @@ import (
 	"net/http"
 
 	"github.com/0-mqix/melt"
-	"github.com/0-mqix/melt/playground/templates"
+	"github.com/0-mqix/melt/internal/playground/templates"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 //go:generate go run generate.go
@@ -25,15 +24,20 @@ func Global2(r *http.Request, arguments map[string]any) *templates.Global2Data {
 }
 
 func main() {
-	// m := melt.New(
-	// 	melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates"),
-	// 	melt.WithOutput("./melt.json"),
-	// 	melt.WithStyle(true, "melt", "./templates/main.scss", ""),
-	// 	melt.WithGeneration("./templates/templates.go"),
-	// )
+	production := false
+	var m *melt.Furnace
 
-	build, _ := build.ReadFile("melt.json")
-	m := melt.NewProduction(build)
+	if !production {
+		m = melt.New(
+			melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates"),
+			melt.WithOutput("./melt.json"),
+			melt.WithStyle(true, "melt", "./templates/main.scss", ""),
+			melt.WithGeneration("./templates/templates.go"),
+		)
+	} else {
+		build, _ := build.ReadFile("melt.json")
+		m = melt.NewProduction(build)
+	}
 
 	templates.Load(m, templates.GlobalHandlers{
 		Global1: Global1,
@@ -44,16 +48,14 @@ func main() {
 
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
-
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 
 		templateData := templates.IndexData{
-			Request: r,
+			Styles: m.Styles,
 		}
 
 		arguments := melt.GlobalArguments(map[string]any{
-			"name": "stan",
+			"name": "mqix",
 		})
 
 		root.Write(w, nil, func(w io.Writer) {

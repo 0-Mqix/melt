@@ -215,21 +215,24 @@ func (f *Furnace) Output() {
 
 	if f.Style {
 		fmt.Println("[MELT] updating: styles")
-		f.Styles = ""
+		var styles string
 
 		for _, c := range f.Components {
-			f.Styles += c.Style
+			styles += c.Style
 		}
 
 		fileStyles = f.transpileStyleFiles()
-		f.Styles = fileStyles + f.sortStyles(f.Styles)
+		styles = fileStyles + f.sortStyles(styles)
 
 		if f.StyleOutputFile != "" {
-			writeOutputFile(f.StyleOutputFile, []byte(f.Styles))
+			writeOutputFile(f.StyleOutputFile, []byte(styles))
 		}
+
+		f.Styles = styles
 	}
 
 	if f.OutputFile != "" {
+
 		if f.productionMode {
 			fmt.Println("[MELT] output is currently not suported in production mode")
 			return
