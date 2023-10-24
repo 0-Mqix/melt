@@ -190,11 +190,6 @@ func (f *Furnace) ModifySelectors(
 	for selector, rules := range selectors {
 		for _, name := range strings.Split(selector, ",") {
 
-			if strings.Index(name, "@") == 0 {
-				styles += name + rules
-				continue
-			}
-
 			name, global := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
 
 			if global {
@@ -207,7 +202,7 @@ func (f *Furnace) ModifySelectors(
 			selector, err := css.Parse(name)
 
 			if err != nil {
-				styleError(path, err)
+				styles += name + rules
 				continue
 			}
 
