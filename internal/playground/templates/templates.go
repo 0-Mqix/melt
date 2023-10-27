@@ -9,89 +9,21 @@ import (
 )
 
 var (
-	Global1 *melt.Component
-	Index   *melt.Component
-	Global3 *melt.Component
-	Global2 *melt.Component
+	Index *melt.Component
 )
 
 type GlobalHandlers struct {
-	Global3 func(r *http.Request, arguments map[string]any) *Global3Data
-	Global2 func(r *http.Request, arguments map[string]any) *Global2Data
-	Global1 func(r *http.Request, arguments map[string]any) *Global1Data
 }
 
 func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
-	Global3 = furnace.MustGetComponent("templates/global3.html")
-	Global2 = furnace.MustGetComponent("templates/global2.html")
-	Global1 = furnace.MustGetComponent("templates/global1.html")
 	Index = furnace.MustGetComponent("templates/index.html")
 
 	globalHandlers := make(map[string]melt.GlobalHandler)
-	var handler melt.GlobalHandler
-
-	if handlers.Global3 != nil {
-		handler = func(r *http.Request, arguments map[string]any) any { return handlers.Global3(r, arguments) }
-	} else {
-		handler = func(r *http.Request, _ map[string]any) any { return &Global3Data{} }
-	}
-
-	globalHandlers["templates/global3.html"] = handler
-
-	if handlers.Global2 != nil {
-		handler = func(r *http.Request, arguments map[string]any) any { return handlers.Global2(r, arguments) }
-	} else {
-		handler = func(r *http.Request, _ map[string]any) any { return &Global2Data{} }
-	}
-
-	globalHandlers["templates/global2.html"] = handler
-
-	if handlers.Global1 != nil {
-		handler = func(r *http.Request, arguments map[string]any) any { return handlers.Global1(r, arguments) }
-	} else {
-		handler = func(r *http.Request, _ map[string]any) any { return &Global1Data{} }
-	}
-
-	globalHandlers["templates/global1.html"] = handler
 
 	furnace.SetGlobalHandlers(globalHandlers)
 }
 
-type Global3Data struct{}
-
-// generated write function for component
-//
-//	path: "templates/global3.html"
-func WriteGlobal3(w io.Writer, r *http.Request, data Global3Data, globalOptions ...melt.GlobalOption) error {
-	return Global3.Write(w, r, data, globalOptions...)
-}
-
-type Global2Data struct {
-	Data any
-}
-
-// generated write function for component
-//
-//	path: "templates/global2.html"
-func WriteGlobal2(w io.Writer, r *http.Request, data Global2Data, globalOptions ...melt.GlobalOption) error {
-	return Global2.Write(w, r, data, globalOptions...)
-}
-
-type Global1Data struct {
-	Message any
-	Name    any
-}
-
-// generated write function for component
-//
-//	path: "templates/global1.html"
-func WriteGlobal1(w io.Writer, r *http.Request, data Global1Data, globalOptions ...melt.GlobalOption) error {
-	return Global1.Write(w, r, data, globalOptions...)
-}
-
-type IndexData struct {
-	Styles any
-}
+type IndexData struct{}
 
 // generated write function for component
 //

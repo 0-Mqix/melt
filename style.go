@@ -16,7 +16,7 @@ import (
 var (
 	styleSelectorRegex = regexp.MustCompile(`(?m)(?s)([^{}]+)\s*({.+?})`)
 	styleCommentRegex  = regexp.MustCompile(`(?m)(?s)\/\*.+?\*\/`)
-	queryRegex         = regexp.MustCompile(`(?m)(?s)(@[^{]+)({([^{]+{.*})*\s*})`)
+	queryRegex         = regexp.MustCompile(`(?m)(?s)(@[^{}]+){((?:[^{}]+{[^{}]+})*\s*)}`)
 )
 
 const (
@@ -149,7 +149,7 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 		selector := queryRegex.FindStringSubmatch(s)
 		querySelectors := make(map[string]string)
 
-		for _, style := range styleSelectorRegex.FindAllStringSubmatch(selector[3], -1) {
+		for _, style := range styleSelectorRegex.FindAllStringSubmatch(selector[2], -1) {
 			if len(style) != 3 {
 				continue
 			}

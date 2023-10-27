@@ -16,6 +16,10 @@ NOTE:
 	- %s does ofcouse not work for global components
 
 TODO:
+  - component without vars not generated
+  - type gen is silly
+  - templates do feel icky
+  - component write with & data
   - create a template project with lit
   - improve error handeling
   - add build in hx boost in root

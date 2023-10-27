@@ -1,14 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
-  <link rel="stylesheet" href="/style.css">
-  <script src="https://unpkg.com/htmx.org@1.9.4"></script>
-</head>
+<html>
+	<head>
 
-<body>
-  {{ html .Body }}
-</body>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>monkey</title>
+
+		<link rel="stylesheet" href="/style.css" />
+		<style>
+			@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
+			
+			* {
+    			font-family: 'JetBrains Mono', monospace;
+    			box-sizing: border-box;
+			}
+
+			html {
+				width: 100%;
+			}
+
+			:root {
+				--color: #e4e4e4;
+				--background-color: #131313;
+			}
+
+			body {
+				color: var(--color);
+				background-color: var(--background-color);
+			}
+
+		</style>
+	</head>
+
+	<body>
+		{{ html .Body }}
+	</body>
 </html>

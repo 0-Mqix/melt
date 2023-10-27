@@ -16,13 +16,6 @@ import (
 //go:embed "melt.json"
 var build embed.FS
 
-func Global1(r *http.Request, _ map[string]any) *templates.Global1Data {
-	return &templates.Global1Data{Name: "1", Message: "hi"}
-}
-func Global2(r *http.Request, arguments map[string]any) *templates.Global2Data {
-	return &templates.Global2Data{Data: arguments["name"]}
-}
-
 func main() {
 	production := false
 	var m *melt.Furnace
@@ -31,7 +24,7 @@ func main() {
 		m = melt.New(
 			melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates"),
 			melt.WithOutput("./melt.json"),
-			melt.WithStyle(true, "melt", "./templates/main.scss", ""),
+			melt.WithStyle(true, "melt", "./templates/styles/main.scss", ""),
 			melt.WithGeneration("./templates/templates.go"),
 		)
 	} else {
@@ -39,10 +32,7 @@ func main() {
 		m = melt.NewProduction(build)
 	}
 
-	templates.Load(m, templates.GlobalHandlers{
-		Global1: Global1,
-		Global2: Global2,
-	})
+	templates.Load(m, templates.GlobalHandlers{})
 
 	root := m.MustGetRoot("./templates/root.html")
 
@@ -50,16 +40,14 @@ func main() {
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 
-		templateData := templates.IndexData{
-			Styles: m.Styles,
-		}
-
-		arguments := melt.GlobalArguments(map[string]any{
-			"name": "mqix",
-		})
-
 		root.Write(w, nil, func(w io.Writer) {
-			templates.WriteIndex(w, r, templateData, arguments)
+			templates.Index.Write(w, r, nil)
+		})
+	})
+
+	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		root.Write(w, nil, func(w io.Writer) {
+			templates.Index.WriteTemplate(w, "test", 2)
 		})
 	})
 
