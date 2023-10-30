@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	globalsRegex       = regexp.MustCompile(`(?m)(?s)%g[^{},]*`)
 	styleSelectorRegex = regexp.MustCompile(`(?m)(?s)([^{}]+)\s*({.+?})`)
 	styleCommentRegex  = regexp.MustCompile(`(?m)(?s)\/\*.+?\*\/`)
 	queryRegex         = regexp.MustCompile(`(?m)(?s)(@[^{}]+){((?:[^{}]+{[^{}]+})*\s*)}`)
@@ -21,7 +22,7 @@ var (
 
 const (
 	MELT_INTERNAL_GLOBAL_PREFIX = "#MELT-INTERNAL-GLOBAL"
-	MELT_INTERNAL_SCOPED_PREFIX = "#MELT-INTERNAL-SCOPED"
+	MELT_INTERNAL_SCOPED_PREFIX = "#MELT-INTERNAL-GLOBAL"
 )
 
 func styleError(path string, message any) {
@@ -94,30 +95,8 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 	styles = styleCommentRegex.ReplaceAllString(styles, "")
 	scopedSelectors := make([]string, 0)
 
-	//STEP: PREPARE SCSS FOR % GLOBAL
-	styles = styleSelectorRegex.ReplaceAllStringFunc(styles, func(s string) string {
-		result := styleSelectorRegex.FindStringSubmatch(s)
-		selectors := make([]string, 0)
-
-		for _, selector := range strings.Split(result[1], ",") {
-
-			selector = strings.TrimLeftFunc(selector, func(r rune) bool {
-				return unicode.IsSpace(r)
-			})
-
-			if strings.Index(selector, "%g") == 0 {
-				selectors = append(selectors, MELT_INTERNAL_GLOBAL_PREFIX+selector[2:])
-
-			} else if strings.Index(selector, "%s") == 0 {
-				selectors = append(selectors, MELT_INTERNAL_SCOPED_PREFIX+selector[2:])
-
-			} else {
-				selectors = append(selectors, selector)
-			}
-		}
-
-		return strings.Join(selectors, ",") + result[2]
-	})
+	//STEP: PREPARE GLOBALS
+	styles = prepareGlobals(styles)
 
 	// STEP: TRANSPILE SCSS WITH DART SASS
 	transpiler, err := sass.Start(sass.Options{LogEventHandler: func(e sass.LogEvent) {
@@ -157,7 +136,7 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 			querySelectors[style[1]] = style[2]
 		}
 
-		modified, scoped := f.ModifySelectors(path, component, styleId, document, querySelectors)
+		modified, scoped := f.modifySelectors(path, component, styleId, document, querySelectors)
 		scopedSelectors = append(scopedSelectors, scoped...)
 
 		selectors[selector[1]] = "{" + modified + "}"
@@ -173,13 +152,24 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 		selectors[style[1]] = style[2]
 	}
 
-	styles, scoped := f.ModifySelectors(path, component, styleId, document, selectors)
+	styles, scoped := f.modifySelectors(path, component, styleId, document, selectors)
 	scopedSelectors = append(scopedSelectors, scoped...)
 
 	return styles, scopedSelectors, nil
 }
 
-func (f *Furnace) ModifySelectors(
+func prepareGlobals(styles string) string {
+	return globalsRegex.ReplaceAllStringFunc(styles, func(s string) string {
+		if strings.Index(s, "%g") == 0 {
+			s = MELT_INTERNAL_GLOBAL_PREFIX + s[2:]
+		} else if strings.Index(s, "%s") == 0 {
+			s = MELT_INTERNAL_SCOPED_PREFIX + s[2:]
+		}
+		return s
+	})
+}
+
+func (f *Furnace) modifySelectors(
 	path, component, styleId string,
 	document *html.Node,
 	selectors map[string]string,
@@ -190,6 +180,8 @@ func (f *Furnace) ModifySelectors(
 	for selector, rules := range selectors {
 		for _, name := range strings.Split(selector, ",") {
 
+			fmt.Println(name)
+
 			name, global := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
 
 			if global {
@@ -198,20 +190,7 @@ func (f *Furnace) ModifySelectors(
 			}
 
 			name, scoped := strings.CutPrefix(name, MELT_INTERNAL_SCOPED_PREFIX)
-
 			selector, err := css.Parse(name)
-
-			if err != nil {
-				styles += name + rules
-				continue
-			}
-
-			results := selector.Select(document)
-
-			if len(results) == 0 && !scoped {
-				styles += name + rules
-				continue
-			}
 
 			if scoped {
 				styles += name + "." + f.StylePrefix + "-scoped-" + component + rules
@@ -220,7 +199,10 @@ func (f *Furnace) ModifySelectors(
 				styles += name + "." + styleId + rules
 			}
 
-			f.addMeltSelectors(results, styleId)
+			if err == nil {
+				results := selector.Select(document)
+				f.addMeltSelectors(results, styleId)
+			}
 		}
 	}
 

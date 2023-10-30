@@ -16,6 +16,7 @@ NOTE:
 	- %s does ofcouse not work for global components
 
 TODO:
+  - rewrite styling to work better and i think %s not working
   - component without vars not generated
   - type gen is silly
   - templates do feel icky
@@ -231,6 +232,8 @@ func (f *Furnace) Output() {
 		if f.StyleOutputFile != "" {
 			writeOutputFile(f.StyleOutputFile, []byte(styles))
 		}
+
+		fmt.Println("\nstyles:", styles)
 
 		f.Styles = styles
 	}
