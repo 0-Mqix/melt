@@ -186,7 +186,7 @@ func (f *Furnace) modifySelectors(
 
 			name, global := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
 
-			if global {
+			if global || strings.Index(name, "@") == 0 {
 				styles += name + rules
 				continue
 			}
