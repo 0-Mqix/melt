@@ -160,12 +160,16 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 
 func prepareGlobals(styles string) string {
 	return globalsRegex.ReplaceAllStringFunc(styles, func(s string) string {
+
 		if strings.Index(s, "%g") == 0 {
-			s = MELT_INTERNAL_GLOBAL_PREFIX + s[2:]
+			return MELT_INTERNAL_GLOBAL_PREFIX + s[2:]
+
 		} else if strings.Index(s, "%s") == 0 {
-			s = MELT_INTERNAL_SCOPED_PREFIX + s[2:]
+			return MELT_INTERNAL_SCOPED_PREFIX + s[2:]
+
+		} else {
+			return s
 		}
-		return s
 	})
 }
 
@@ -179,8 +183,6 @@ func (f *Furnace) modifySelectors(
 
 	for selector, rules := range selectors {
 		for _, name := range strings.Split(selector, ",") {
-
-			fmt.Println(name)
 
 			name, global := strings.CutPrefix(name, MELT_INTERNAL_GLOBAL_PREFIX)
 
