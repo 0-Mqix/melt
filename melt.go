@@ -233,8 +233,6 @@ func (f *Furnace) Output() {
 			writeOutputFile(f.StyleOutputFile, []byte(styles))
 		}
 
-		fmt.Println("\nstyles:", styles)
-
 		f.Styles = styles
 	}
 
