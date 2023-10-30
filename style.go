@@ -209,6 +209,7 @@ func (f *Furnace) ModifySelectors(
 			results := selector.Select(document)
 
 			if len(results) == 0 && !scoped {
+				styles += name + rules
 				continue
 			}
 
