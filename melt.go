@@ -85,7 +85,7 @@ func New(options ...meltOption) *Furnace {
 	return f
 }
 
-func NewProduction(input []byte) *Furnace {
+func NewProduction(input []byte, ComponentFunctions, RootFunctions text.FuncMap) *Furnace {
 	var build Build
 	err := json.Unmarshal(input, &build)
 
@@ -101,19 +101,30 @@ func NewProduction(input []byte) *Furnace {
 
 	for _, c := range build.Components {
 		template := template.New(c.Name).Funcs(Functions)
+
+		if ComponentFunctions != nil {
+			template.Funcs(ComponentFunctions)
+		}
+
 		c.Template, err = template.Parse(c.String)
 
 		if err != nil {
 			panic("[MELT] invalid input at component from " + c.Path)
 		}
+
 		c.furnace = f
 		f.Components[c.Path] = c
 		f.Styles += c.Style
-		f.Styles = build.FileStyles + f.Styles
+		f.Styles = build.FileStyles + f.sortStyles(f.Styles)
 	}
 
 	for _, r := range build.Roots {
 		template := template.New(r.Path).Funcs(RootFunctions)
+
+		if RootFunctions != nil {
+			template.Funcs(RootFunctions)
+		}
+
 		r.Template, err = template.Parse(r.String)
 
 		if err != nil {

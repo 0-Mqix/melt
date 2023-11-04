@@ -17,7 +17,7 @@ import (
 var build embed.FS
 
 func main() {
-	production := false
+	production := true
 	var m *melt.Furnace
 
 	if !production {
@@ -29,7 +29,7 @@ func main() {
 		)
 	} else {
 		build, _ := build.ReadFile("melt.json")
-		m = melt.NewProduction(build)
+		m = melt.NewProduction(build, nil, nil)
 	}
 
 	templates.Load(m, templates.GlobalHandlers{})
