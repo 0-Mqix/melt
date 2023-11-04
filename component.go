@@ -48,7 +48,7 @@ type Component struct {
 	furnace *Furnace `json:"-"`
 
 	Template *template.Template `json:"-"`
-	String   string             `json:"template"`
+	String   Html               `json:"template"`
 
 	Style string `json:"style"`
 	Name  string `json:"name"`

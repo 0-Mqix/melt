@@ -14,21 +14,21 @@ const RELOAD_EVENT_SCRIPT = "new EventSource(\"%s\").onmessage = function (e) {i
 
 type Root struct {
 	Template *template.Template `json:"-"`
-	String   string             `json:"template"`
+	String   Html               `json:"template"`
 	Path     string             `json:"path"`
 }
 
 func (r *Root) Write(w io.Writer, data any, write func(w io.Writer)) error {
 	var templateData struct {
-		Body string
+		Body template.HTML
 		Data any
 	}
 
 	templateData.Data = data
 
-	writer := bytes.NewBufferString("")
-	write(writer)
-	templateData.Body = writer.String()
+	buffer := bytes.NewBufferString("")
+	write(buffer)
+	templateData.Body = template.HTML(buffer.String())
 
 	err := r.Template.Execute(w, templateData)
 
@@ -131,13 +131,12 @@ func (f *Furnace) createRoot(path string, reader io.Reader, withReloadEvents boo
 	html.Render(buffer, document)
 	raw := buffer.String()
 
-	template := template.New(path).Funcs(RootFunctions).Funcs(f.RootFuncMap)
-
+	template := template.New(path).Funcs(rootFunctions).Funcs(f.RootFunctions)
 	template, err = template.Parse(raw)
 
 	if err != nil {
-		fmt.Println("[MELT] error with creating root at path:", path)
+		fmt.Printf("[MELT] error with creating root at path %s: %s\n", path, err)
 	}
 
-	return &Root{Template: template, String: raw, Path: path}, nil
+	return &Root{Template: template, String: Html(raw), Path: path}, nil
 }

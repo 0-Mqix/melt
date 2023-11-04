@@ -9,13 +9,15 @@ import (
 )
 
 var (
-	Index *melt.Component
+	Index            *melt.Component
+	ComponentsHeader *melt.Component
 )
 
 type GlobalHandlers struct {
 }
 
 func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
+	ComponentsHeader = furnace.MustGetComponent("templates/components/header.html")
 	Index = furnace.MustGetComponent("templates/index.html")
 
 	globalHandlers := make(map[string]melt.GlobalHandler)
@@ -30,4 +32,13 @@ type IndexData struct{}
 //	path: "templates/index.html"
 func WriteIndex(w io.Writer, r *http.Request, data IndexData, globalOptions ...melt.GlobalOption) error {
 	return Index.Write(w, r, data, globalOptions...)
+}
+
+type ComponentsHeaderData struct{}
+
+// generated write function for component
+//
+//	path: "templates/components/header.html"
+func WriteComponentsHeader(w io.Writer, r *http.Request, data ComponentsHeaderData, globalOptions ...melt.GlobalOption) error {
+	return ComponentsHeader.Write(w, r, data, globalOptions...)
 }

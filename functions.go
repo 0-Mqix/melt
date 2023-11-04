@@ -7,13 +7,15 @@ import (
 	text "text/template"
 )
 
-var Functions = template.FuncMap{
+var componentFunctions = template.FuncMap{
 	"comment": commentFunction,
 	"global":  globalFunction,
+	"html":    htmlFunction,
 }
 
-var RootFunctions = text.FuncMap{
-	"html": htmlFunction,
+var rootFunctions = text.FuncMap{
+	"comment": commentFunction,
+	"html":    htmlFunction,
 }
 
 func commentFunction(s string) template.HTML {

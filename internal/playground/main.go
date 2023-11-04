@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/0-mqix/melt"
 	"github.com/0-mqix/melt/internal/playground/templates"
@@ -17,7 +18,8 @@ import (
 var build embed.FS
 
 func main() {
-	production := true
+	production := len(os.Args) == 2 && os.Args[1] == "production"
+
 	var m *melt.Furnace
 
 	if !production {
@@ -39,6 +41,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("index")
 
 		root.Write(w, nil, func(w io.Writer) {
 			templates.Index.Write(w, r, nil)
@@ -58,5 +61,5 @@ func main() {
 
 	r.Get("/reload_event", m.ReloadEventHandler)
 
-	fmt.Println("[HTTP]", http.ListenAndServe(":3000", r))
+	fmt.Println("[HTTP]", http.ListenAndServe(":4000", r))
 }

@@ -274,7 +274,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		Style:    style,
 		Global:   global,
 		Globals:  make([]string, 0),
-		Template: template.New(name).Funcs(Functions).Funcs(f.ComponentFuncMap),
+		Template: template.New(name).Funcs(componentFunctions).Funcs(f.ComponentFunctions),
 		defaults: defaults,
 		furnace:  f,
 	}
@@ -339,9 +339,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	formatter.Condense = true
 	templateString = formatter.Format(templateString)
 
-	component.String = templateString
-
 	// STEP: PARSE TEMPLATE FINALY
+	component.String = Html(templateString)
 	component.Template.Parse(templateString)
 
 	if f.PrintRenderOutput {

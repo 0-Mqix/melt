@@ -2,6 +2,7 @@ package melt
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -45,11 +46,11 @@ type Furnace struct {
 	OutputFile             string //if not empty melt will write a output file that is used to use your components in production
 	GenerationOutputFile   string //if not empty melt will generate a golang file with types and functions to easly call a template with the found types
 
-	Components       map[string]*Component
-	ComponentFuncMap template.FuncMap
+	Components         map[string]*Component
+	ComponentFunctions template.FuncMap
 
-	Roots       map[string]*Root
-	RootFuncMap text.FuncMap
+	Roots         map[string]*Root
+	RootFunctions text.FuncMap
 
 	Styles string
 
@@ -87,6 +88,7 @@ func New(options ...meltOption) *Furnace {
 
 func NewProduction(input []byte, ComponentFunctions, RootFunctions text.FuncMap) *Furnace {
 	var build Build
+
 	err := json.Unmarshal(input, &build)
 
 	if err != nil {
@@ -100,13 +102,13 @@ func NewProduction(input []byte, ComponentFunctions, RootFunctions text.FuncMap)
 	}
 
 	for _, c := range build.Components {
-		template := template.New(c.Name).Funcs(Functions)
+		template := template.New(c.Name).Funcs(componentFunctions)
 
 		if ComponentFunctions != nil {
 			template.Funcs(ComponentFunctions)
 		}
 
-		c.Template, err = template.Parse(c.String)
+		c.Template, err = template.Parse(string(c.String))
 
 		if err != nil {
 			panic("[MELT] invalid input at component from " + c.Path)
@@ -119,13 +121,13 @@ func NewProduction(input []byte, ComponentFunctions, RootFunctions text.FuncMap)
 	}
 
 	for _, r := range build.Roots {
-		template := template.New(r.Path).Funcs(RootFunctions)
+		template := template.New(r.Path).Funcs(rootFunctions)
 
 		if RootFunctions != nil {
 			template.Funcs(RootFunctions)
 		}
 
-		r.Template, err = template.Parse(r.String)
+		r.Template, err = template.Parse(string(r.String))
 
 		if err != nil {
 			panic("[MELT] invalid input at root from " + r.Path)
@@ -186,13 +188,13 @@ func WithStyle(value bool, prefix, inputPath, outputPath string) meltOption {
 
 func WithComponentFuncMap(funcs template.FuncMap) meltOption {
 	return func(f *Furnace) {
-		f.ComponentFuncMap = funcs
+		f.ComponentFunctions = funcs
 	}
 }
 
 func WithRootFuncMap(funcs text.FuncMap) meltOption {
 	return func(f *Furnace) {
-		f.RootFuncMap = funcs
+		f.RootFunctions = funcs
 	}
 }
 
@@ -274,12 +276,38 @@ func (f *Furnace) Output() {
 			output.Roots = append(output.Roots, root)
 		}
 
-		raw, err := json.Marshal(output)
+		build, err := json.Marshal(output)
 		if err != nil {
 			fmt.Println("[MELT] [BUILD]", err)
 			return
 		}
 
-		writeOutputFile(f.OutputFile, raw)
+		writeOutputFile(f.OutputFile, build)
 	}
+}
+
+type Html string
+
+// MarshalJSON encodes the html content using base64 encoding.
+func (h Html) MarshalJSON() ([]byte, error) {
+	encoded := base64.RawStdEncoding.EncodeToString([]byte(h))
+	return json.Marshal(encoded)
+}
+
+// UnmarshalJSON decodes the html content from base64 encoding.
+func (h *Html) UnmarshalJSON(data []byte) error {
+	var encoded string
+
+	if err := json.Unmarshal(data, &encoded); err != nil {
+		return err
+	}
+
+	decoded, err := base64.RawStdEncoding.DecodeString(encoded)
+
+	if err != nil {
+		return err
+	}
+
+	*h = Html(decoded)
+	return nil
 }
