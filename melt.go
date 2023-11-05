@@ -117,8 +117,9 @@ func NewProduction(input []byte, ComponentFunctions, RootFunctions text.FuncMap)
 		c.furnace = f
 		f.Components[c.Path] = c
 		f.Styles += c.Style
-		f.Styles = build.FileStyles + f.sortStyles(f.Styles)
 	}
+
+	f.Styles = build.FileStyles + f.sortStyles(f.Styles)
 
 	for _, r := range build.Roots {
 		template := template.New(r.Path).Funcs(rootFunctions)
