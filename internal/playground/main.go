@@ -24,7 +24,7 @@ func main() {
 
 	if !production {
 		m = melt.New(
-			melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates"),
+			melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates", "./styles"),
 			melt.WithOutput("./melt.json"),
 			melt.WithStyle(true, "melt", "./templates/styles/main.scss", ""),
 			melt.WithGeneration("./templates/templates.go"),
