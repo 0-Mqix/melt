@@ -12,22 +12,6 @@ import (
 	text "text/template"
 )
 
-/* \
-NOTE:
-	- %s does ofcouse not work for global components
-
-TODO:
-  - rewrite styling to work better and i think %s not working
-  - component without vars not generated
-  - type gen is silly
-  - templates do feel icky
-  - component write with & data
-  - create a template project with lit
-  - improve error handeling
-  - add build in hx boost in root
-  - make readme with documentation
-*/
-
 type contextValueKey string
 
 const GLOBALS_CONTEXT_KEY contextValueKey = "globals"
