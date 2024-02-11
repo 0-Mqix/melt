@@ -15,10 +15,7 @@ var (
 
 // component instances
 var (
-	ComponentsHeader *melt.Component
-	Index            *melt.Component
-	Test1            *melt.Component
-	Test2            *melt.Component
+	Index *melt.Component
 )
 
 type GlobalHandlers struct {
@@ -27,9 +24,6 @@ type GlobalHandlers struct {
 func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
 	Root = furnace.MustGetRoot("templates/root.html")
 
-	Test1 = furnace.MustGetComponent("templates/test1.html")
-	Test2 = furnace.MustGetComponent("templates/test2.html")
-	ComponentsHeader = furnace.MustGetComponent("templates/components/header.html")
 	Index = furnace.MustGetComponent("templates/index.html")
 
 	globalHandlers := make(map[string]melt.GlobalHandler)
@@ -37,43 +31,14 @@ func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
 	furnace.SetGlobalHandlers(globalHandlers)
 }
 
-type Test1Data struct{}
-
-// generated write function for component
-//
-//	path: "templates/test1.html"
-func WriteTest1(w io.Writer, r *http.Request, data *Test1Data, globalOptions ...melt.GlobalOption) error {
-	return Test1.Write(w, r, data, globalOptions...)
-}
-
-type Test2CodeData struct {
-	Code any
-}
+type IndexXData struct{}
 
 // generated write function for a template in a component
 //
-//	path: "templates/test2.html"
-//	template: "code"
-func WriteTest2Code(w io.Writer, data *Test2CodeData) error {
-	return Test2.WriteTemplate(w, "code", data)
-}
-
-type Test2Data struct{}
-
-// generated write function for component
-//
-//	path: "templates/test2.html"
-func WriteTest2(w io.Writer, r *http.Request, data *Test2Data, globalOptions ...melt.GlobalOption) error {
-	return Test2.Write(w, r, data, globalOptions...)
-}
-
-type ComponentsHeaderData struct{}
-
-// generated write function for component
-//
-//	path: "templates/components/header.html"
-func WriteComponentsHeader(w io.Writer, r *http.Request, data *ComponentsHeaderData, globalOptions ...melt.GlobalOption) error {
-	return ComponentsHeader.Write(w, r, data, globalOptions...)
+//	path: "templates/index.html"
+//	template: "x"
+func WriteIndexX(w io.Writer, data *IndexXData) error {
+	return Index.WriteTemplate(w, "x", data)
 }
 
 type IndexData struct{}
@@ -83,14 +48,4 @@ type IndexData struct{}
 //	path: "templates/index.html"
 func WriteIndex(w io.Writer, r *http.Request, data *IndexData, globalOptions ...melt.GlobalOption) error {
 	return Index.Write(w, r, data, globalOptions...)
-}
-
-type Test1CodeData struct{}
-
-// generated write function for a template in a component
-//
-//	path: "templates/test1.html"
-//	template: "code"
-func WriteTest1Code(w io.Writer, data *Test1CodeData) error {
-	return Test1.WriteTemplate(w, "code", data)
 }

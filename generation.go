@@ -20,7 +20,7 @@ type generationData struct {
 
 func Generate(file string, extentions []string, paths ...string) {
 
-	m := New(WithGeneration(file), WithPrintRenderOutput(false))
+	m := New(WithGeneration(file), WithPrintRenderOutput(true))
 
 	for _, path := range paths {
 
@@ -167,8 +167,8 @@ func extractGenerationData(templateString string) *generationData {
 	matches := TemplateFunctionRegex.FindAllStringSubmatch(templateString, -1)
 	blocks := []string{""}
 
+	templates := templates{"": make(map[string]string)}
 	imports := make(map[string]string)
-	templates := make(templates)
 	calls := make(calls)
 
 	for _, match := range matches {
@@ -177,10 +177,6 @@ func extractGenerationData(templateString string) *generationData {
 		for i, token := range tokens {
 
 			template := blocks[len(blocks)-1]
-
-			if _, ok := templates[template]; !ok {
-				templates[template] = map[string]string{}
-			}
 
 			if strings.Index(token, ".") == 0 {
 				token := "." + strings.Split(token, ".")[1]
@@ -220,7 +216,12 @@ func extractGenerationData(templateString string) *generationData {
 		switch tokens[0] {
 		case "define":
 			if len(tokens) > 1 {
-				blocks = append(blocks, tokens[1])
+				template := tokens[1]
+				blocks = append(blocks, template)
+
+				if _, ok := templates[template]; !ok {
+					templates[template] = make(map[string]string)
+				}
 			}
 
 		case "block", "template":
@@ -239,14 +240,11 @@ func extractGenerationData(templateString string) *generationData {
 				calls[block][variable] = append(calls[block][variable], template)
 			}
 
-			if tokens[0] == "block" {
-				template := tokens[1]
-				if _, ok := templates[template]; !ok {
-					templates[template] = make(map[string]string)
-				}
-
-				blocks = append(blocks, template)
+			if _, ok := templates[template]; !ok {
+				templates[template] = make(map[string]string)
 			}
+
+			blocks = append(blocks, template)
 
 		case "with", "range":
 			blocks = append(blocks, tokens[0])
