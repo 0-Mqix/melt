@@ -85,7 +85,7 @@ func SplitIgnoreType(s string, sep rune) []string {
 }
 
 func (f *Furnace) generate() {
-	path := formatPath(f.GenerationOutputFile)
+	path := formatPath(f.generationOutputFile)
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 
 	components := make(map[string]string)
@@ -116,7 +116,7 @@ func (f *Furnace) generate() {
 			imports += fmt.Sprintf("%s \"%s\"\n", name, path)
 		}
 
-		for k, v := range createTypes(component.Name, path, component.generationData) {
+		for k, v := range createTypes(component.Name, component.generationData) {
 			dataTypes[k] = v
 		}
 
@@ -157,7 +157,7 @@ func (f *Furnace) generate() {
 	bytes, err := format.Source([]byte(code))
 
 	if err == nil {
-		writeOutputFile(f.GenerationOutputFile, bytes)
+		writeOutputFile(f.generationOutputFile, bytes)
 	} else {
 		fmt.Println("[MELT] generation error:", err)
 	}
@@ -280,7 +280,7 @@ func createWriteFuncs(name, path string, data *generationData) map[string]string
 	return result
 }
 
-func createTypes(name, path string, data *generationData) map[string]string {
+func createTypes(name string, data *generationData) map[string]string {
 	result := make(map[string]string)
 
 	for template, variables := range data.templates {

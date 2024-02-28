@@ -17,18 +17,27 @@ type contextValueKey string
 const GLOBALS_CONTEXT_KEY contextValueKey = "globals"
 
 type Furnace struct {
-	ComponentComments      bool   //adds comments to the html so you can see wat the source of the html is
-	AutoReloadEvent        bool   //enables the live reloading features you still have to call f.StartWatcher(paths ...string) or you can just use the option WithAutoReloadEvent
-	AutoReloadEventUrl     string //the url that is pointed to f.ReloadEventHandler
-	PrintRenderOutput      bool   //prints out the template after a render
-	AutoUpdateImports      bool   //update all imports with the renamed path only works with the watcher
-	WatcherSendReloadEvent bool   //send a reload event on watcher event
-	Style                  bool   //scss in <style> -> dart sass -> localize the styles to the component
-	StyleOutputFile        string //if not empty melt will write all the styles to this file
-	StyleInputFile         string //if not empty melt will use this file as an main scss file
-	StylePrefix            string //the prefix of the css melt adds to the elements for localization
-	OutputFile             string //if not empty melt will write a output file that is used to use your components in production
-	GenerationOutputFile   string //if not empty melt will generate a golang file with types and functions to easly call a template with the found types
+	componentComments bool
+	printRenderOutput bool
+
+	autoReloadEvent        bool
+	autoReloadEventUrl     string
+	autoUpdateImports      bool
+	watcherSendReloadEvent bool
+
+	style           bool
+	styleOutputFile string
+	styleInputFile  string
+	stylePrefix     string
+
+	outputFile           string
+	generationOutputFile string
+
+	tailwind           bool
+	tailwindExecutable string
+	tailwindInputFile  string
+	tailwindOutputFile string
+	tailwindConfigFile string
 
 	Components         map[string]*Component
 	ComponentFunctions template.FuncMap
@@ -36,7 +45,8 @@ type Furnace struct {
 	Roots         map[string]*Root
 	RootFunctions text.FuncMap
 
-	Styles string
+	Styles         string
+	TailwindStyles string
 
 	reloadSubscribers map[string]chan bool
 	subscribersMutex  sync.Mutex
@@ -47,9 +57,10 @@ type Furnace struct {
 }
 
 type Build struct {
-	Components []*Component `json:"components"`
-	Roots      []*Root      `json:"roots"`
-	FileStyles string       `json:"file_styles"`
+	Components     []*Component `json:"components"`
+	Roots          []*Root      `json:"roots"`
+	FileStyles     string       `json:"file_styles"`
+	TailwindStyles string       `json:"tailwind_styles"`
 }
 
 type meltOption func(*Furnace)
@@ -104,6 +115,7 @@ func NewProduction(input []byte, ComponentFunctions, RootFunctions text.FuncMap)
 	}
 
 	f.Styles = build.FileStyles + f.sortStyles(f.Styles)
+	f.TailwindStyles = build.TailwindStyles
 
 	for _, r := range build.Roots {
 		template := template.New(r.Path).Funcs(rootFunctions)
@@ -126,22 +138,22 @@ func NewProduction(input []byte, ComponentFunctions, RootFunctions text.FuncMap)
 
 func WithPrintRenderOutput(value bool) meltOption {
 	return func(f *Furnace) {
-		f.PrintRenderOutput = value
+		f.printRenderOutput = value
 	}
 }
 
 func WithComponentComments(value bool) meltOption {
 	return func(f *Furnace) {
-		f.ComponentComments = value
+		f.componentComments = value
 	}
 }
 
 func WithWatcher(reloadEventUrl string, autoUpdateImports, watcherSendReloadEvent bool, extentions []string, paths ...string) meltOption {
 	return func(f *Furnace) {
-		f.AutoReloadEvent = true
-		f.AutoReloadEventUrl = reloadEventUrl
-		f.AutoUpdateImports = autoUpdateImports
-		f.WatcherSendReloadEvent = watcherSendReloadEvent
+		f.autoReloadEvent = true
+		f.autoReloadEventUrl = reloadEventUrl
+		f.autoUpdateImports = autoUpdateImports
+		f.watcherSendReloadEvent = watcherSendReloadEvent
 
 		go f.StartWatcher(extentions, paths...)
 	}
@@ -150,24 +162,40 @@ func WithWatcher(reloadEventUrl string, autoUpdateImports, watcherSendReloadEven
 func WithOutput(outputFile string) meltOption {
 	return func(f *Furnace) {
 		if outputFile != "" {
-			f.OutputFile = formatPath(outputFile)
+			f.outputFile = formatPath(outputFile)
 		}
 	}
 }
 
-func WithStyle(value bool, prefix, inputPath, outputPath string) meltOption {
+func WithStyle(prefix, inputPath, outputPath string) meltOption {
 	return func(f *Furnace) {
-		f.Style = value
-		f.StylePrefix = prefix
+		f.style = true
+		f.stylePrefix = prefix
 
 		if inputPath != "" {
-			f.StyleInputFile = formatPath(inputPath)
+			f.styleInputFile = formatPath(inputPath)
 		}
 
 		if outputPath != "" {
-			f.StyleOutputFile = formatPath(outputPath)
+			f.styleOutputFile = formatPath(outputPath)
 		}
 
+	}
+}
+
+func WithTailwind(executable, configPath, inputPath, outputPath string) meltOption {
+	return func(f *Furnace) {
+		f.tailwind = true
+		f.tailwindExecutable = executable
+		f.tailwindConfigFile = formatPath(configPath)
+
+		if inputPath != "" {
+			f.tailwindInputFile = formatPath(inputPath)
+		}
+
+		if outputPath != "" {
+			f.tailwindOutputFile = formatPath(outputPath)
+		}
 	}
 }
 
@@ -185,7 +213,7 @@ func WithRootFuncMap(funcs text.FuncMap) meltOption {
 
 func WithGeneration(path string) meltOption {
 	return func(f *Furnace) {
-		f.GenerationOutputFile = path
+		f.generationOutputFile = path
 	}
 }
 
@@ -216,7 +244,11 @@ func (f *Furnace) SetGlobalHandlers(handlers map[string]GlobalHandler) {
 func (f *Furnace) Output() {
 	var fileStyles string
 
-	if f.Style {
+	if f.tailwind {
+		f.runTailwind()
+	}
+
+	if f.style {
 		fmt.Println("[MELT] updating: styles")
 		var styles string
 
@@ -227,14 +259,14 @@ func (f *Furnace) Output() {
 		fileStyles = f.transpileStyleFiles()
 		styles = fileStyles + f.sortStyles(styles)
 
-		if f.StyleOutputFile != "" {
-			writeOutputFile(f.StyleOutputFile, []byte(styles))
+		if f.styleOutputFile != "" {
+			writeOutputFile(f.styleOutputFile, []byte(styles))
 		}
 
 		f.Styles = styles
 	}
 
-	if f.OutputFile != "" {
+	if f.outputFile != "" {
 
 		if f.productionMode {
 			fmt.Println("[MELT] output is currently not suported in production mode")
@@ -244,6 +276,7 @@ func (f *Furnace) Output() {
 		var output Build
 
 		output.FileStyles = fileStyles
+		output.TailwindStyles = f.TailwindStyles
 
 		for _, c := range f.Components {
 			output.Components = append(output.Components, c)
@@ -267,7 +300,7 @@ func (f *Furnace) Output() {
 			return
 		}
 
-		writeOutputFile(f.OutputFile, build)
+		writeOutputFile(f.outputFile, build)
 	}
 }
 

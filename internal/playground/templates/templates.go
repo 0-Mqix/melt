@@ -31,16 +31,6 @@ func Load(furnace *melt.Furnace, handlers GlobalHandlers) {
 	furnace.SetGlobalHandlers(globalHandlers)
 }
 
-type IndexXData struct{}
-
-// generated write function for a template in a component
-//
-//	path: "templates/index.html"
-//	template: "x"
-func WriteIndexX(w io.Writer, data *IndexXData) error {
-	return Index.WriteTemplate(w, "x", data)
-}
-
 type IndexData struct{}
 
 // generated write function for component

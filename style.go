@@ -55,11 +55,11 @@ func (f *Furnace) sortStyles(styles string) string {
 
 		for _, s := range strings.Split(selector, ".") {
 
-			if strings.Index(s, f.StylePrefix+"-scoped") == 0 {
+			if strings.Index(s, f.stylePrefix+"-scoped") == 0 {
 				scoped = true
 				break
 
-			} else if strings.Index(s, f.StylePrefix+"-") == 0 {
+			} else if strings.Index(s, f.stylePrefix+"-") == 0 {
 				global = false
 				break
 			}
@@ -84,7 +84,7 @@ func (f *Furnace) sortStyles(styles string) string {
 	return styles + scopedStyles + globalStyles + queryStyles
 }
 
-func (f *Furnace) style(path, component, styles string, document *html.Node) (string, []string, error) {
+func (f *Furnace) buildStyle(path, component, styles string, document *html.Node) (string, []string, error) {
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -121,7 +121,7 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 	transpiler.Close()
 
 	//STEP: LOCALIZE CSS
-	styleId := f.StylePrefix + "-" + component
+	styleId := f.stylePrefix + "-" + component
 	selectors := make(map[string]string)
 
 	style := queryRegex.ReplaceAllStringFunc(styleResult.CSS, func(s string) string {
@@ -136,7 +136,7 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 			querySelectors[style[1]] = style[2]
 		}
 
-		modified, scoped := f.modifySelectors(path, component, styleId, document, querySelectors)
+		modified, scoped := f.modifySelectors(component, styleId, document, querySelectors)
 		scopedSelectors = append(scopedSelectors, scoped...)
 
 		selectors[selector[1]] = "{" + modified + "}"
@@ -152,7 +152,7 @@ func (f *Furnace) style(path, component, styles string, document *html.Node) (st
 		selectors[style[1]] = style[2]
 	}
 
-	styles, scoped := f.modifySelectors(path, component, styleId, document, selectors)
+	styles, scoped := f.modifySelectors(component, styleId, document, selectors)
 	scopedSelectors = append(scopedSelectors, scoped...)
 
 	return styles, scopedSelectors, nil
@@ -174,7 +174,7 @@ func prepareGlobals(styles string) string {
 }
 
 func (f *Furnace) modifySelectors(
-	path, component, styleId string,
+	component, styleId string,
 	document *html.Node,
 	selectors map[string]string,
 ) (string, []string) {
@@ -195,7 +195,7 @@ func (f *Furnace) modifySelectors(
 			selector, err := css.Parse(name)
 
 			if scoped {
-				styles += name + "." + f.StylePrefix + "-scoped-" + component + rules
+				styles += name + "." + f.stylePrefix + "-scoped-" + component + rules
 				scopedSelectors = append(scopedSelectors, name)
 			} else {
 				styles += name + "." + styleId + rules
@@ -213,7 +213,7 @@ func (f *Furnace) modifySelectors(
 
 func (f *Furnace) addMeltSelectors(elements []*html.Node, styleId string) {
 	for _, n := range elements {
-		if strings.Index(n.Data, "melt-") == 0 {
+		if strings.Index(n.Data, f.stylePrefix+"-") == 0 {
 			continue
 		}
 
@@ -268,7 +268,7 @@ func (f *Furnace) addScopedMeltSelectors(path, component string, scoped []string
 		}
 
 		results := selector.Select(document)
-		f.addMeltSelectors(results, f.StylePrefix+"-scoped-"+component)
+		f.addMeltSelectors(results, f.stylePrefix+"-scoped-"+component)
 	}
 
 	return nil
@@ -276,7 +276,7 @@ func (f *Furnace) addScopedMeltSelectors(path, component string, scoped []string
 
 func (f *Furnace) transpileStyleFiles() string {
 
-	if f.StyleInputFile == "" {
+	if f.styleInputFile == "" {
 		return ""
 	}
 
@@ -295,7 +295,7 @@ func (f *Furnace) transpileStyleFiles() string {
 		fmt.Println(err)
 	}
 
-	content, err := os.ReadFile(f.StyleInputFile)
+	content, err := os.ReadFile(f.styleInputFile)
 
 	if err != nil {
 		fmt.Println(err)
@@ -305,7 +305,7 @@ func (f *Furnace) transpileStyleFiles() string {
 		Source:         string(content),
 		SourceSyntax:   sass.SourceSyntaxSCSS,
 		OutputStyle:    sass.OutputStyleCompressed,
-		ImportResolver: resolver(f.StyleInputFile),
+		ImportResolver: resolver(f.styleInputFile),
 	})
 
 	if err != nil {

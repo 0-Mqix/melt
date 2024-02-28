@@ -85,7 +85,7 @@ func extractFromBody(n *html.Node, result *[]*html.Node) {
 func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component, error) {
 
 	if f.productionMode {
-		return nil, fmt.Errorf("[MELT] rendering is currently not suported in production mode")
+		return nil, fmt.Errorf("[MELT] rendering is not suported in production mode")
 	}
 
 	raw, err := io.ReadAll(reader)
@@ -237,9 +237,9 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 		case "style":
 			result, ok := getStyle(n)
 			if ok {
-				if !f.Style {
+				if !f.style {
 
-					if f.GenerationOutputFile == "" {
+					if f.generationOutputFile == "" {
 						fmt.Println("[MELT] [SCSS] is not enabled\n->", path)
 					}
 
@@ -263,8 +263,8 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 
 	var scoped []string
 
-	if f.Style {
-		style, scoped, _ = f.style(path, name, style, document)
+	if f.style {
+		style, scoped, _ = f.buildStyle(path, name, style, document)
 	}
 
 	//STEP: CREATE RESULT
@@ -283,7 +283,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	globals := make(map[string]bool)
 	f.useComponents(document, component, imports, globals)
 
-	if f.Style {
+	if f.style {
 		f.addScopedMeltSelectors(path, name, scoped, document)
 	}
 
@@ -324,7 +324,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	})
 
 	//STEP: DATA TYPE GENERATION & TEMPLATE MODIFICATION
-	if f.GenerationOutputFile != "" {
+	if f.generationOutputFile != "" {
 		component.generationData = extractGenerationData(templateString)
 	}
 
@@ -343,7 +343,7 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 	component.String = Html(templateString)
 	component.Template.Parse(templateString)
 
-	if f.PrintRenderOutput {
+	if f.printRenderOutput {
 		fmt.Printf("*** template: %s ***\n%s\n*** end template ***\n", name, templateString)
 	}
 

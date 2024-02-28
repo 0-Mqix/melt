@@ -24,9 +24,10 @@ func main() {
 
 	if !production {
 		m = melt.New(
-			melt.WithWatcher("/reload_event", true, true, []string{".html", ".scss"}, "./templates", "./styles"),
+			melt.WithWatcher("/reload_event", true, true, []string{".html"}, "./templates"),
 			melt.WithOutput("./melt.json"),
-			melt.WithStyle(true, "melt", "./templates/styles/main.scss", ""),
+			melt.WithTailwind("tailwindcss", "./tailwind.config.js", "./styles/tailwind.css", ""),
+			melt.WithStyle("melt", "./styles/main.scss", "./static/style.css"),
 			melt.WithGeneration("./templates/templates.go"),
 		)
 	} else {

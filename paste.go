@@ -214,12 +214,12 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 
 		}
 		if component.Global {
-			f.pasteGlobalComponent(n, component, attributes)
+			f.pasteGlobalComponent(n, component)
 			globals[component.Path] = true
 			goto Next
 		}
 
-		if f.ComponentComments {
+		if f.componentComments {
 			n.AppendChild(&html.Node{
 				Type:      html.CommentNode,
 				Data:      fmt.Sprintf(" + %s: %s ", name, source.Value),
@@ -229,7 +229,7 @@ func (f *Furnace) useComponents(n *html.Node, self *Component, imports map[strin
 
 		f.pasteComponent(n, component, attributes, partials)
 
-		if f.ComponentComments {
+		if f.componentComments {
 			n.AppendChild(&html.Node{
 				Type:      html.CommentNode,
 				Data:      fmt.Sprintf(" - %s ", name),
@@ -272,7 +272,7 @@ func (f *Furnace) pastePartials(name, raw string, partials map[string]string) st
 			return encodeForTemplate(value) + result[2]
 		})
 
-		if f.ComponentComments {
+		if f.componentComments {
 			s = fmt.Sprintf("<!-- + %s -->\n%s<!-- - %s -->\n", n, s, n)
 		}
 
@@ -296,7 +296,6 @@ func (f *Furnace) pastePartials(name, raw string, partials map[string]string) st
 func (f *Furnace) pasteGlobalComponent(
 	n *html.Node,
 	component *Component,
-	attributes []string,
 ) {
 	data := fmt.Sprintf("global \"%s\" .Request @type(\"*http.Request\",\"net/http\")", component.Path)
 

@@ -27,7 +27,7 @@ var (
 	}
 )
 
-const FILE_EVENT_DELAY = time.Duration(50 * time.Millisecond)
+const FILE_EVENT_DELAY = time.Duration(250 * time.Millisecond)
 
 func hasExtention(path string, extentions []string) bool {
 	extention := filepath.Ext(path)
@@ -70,7 +70,7 @@ func handleStyleFileEvent(f *Furnace) func() {
 
 		f.Output()
 
-		if f.WatcherSendReloadEvent {
+		if f.watcherSendReloadEvent {
 			f.SendReloadEvent()
 		}
 	}
@@ -137,7 +137,7 @@ func handleMeltFileEvent(e fs.Event, f *Furnace) func() {
 
 			list, ok := f.dependencyOf[path]
 
-			if ok && f.AutoUpdateImports {
+			if ok && f.autoUpdateImports {
 				for dependency := range list {
 					updateImportPath(dependency, path, created.path)
 				}
@@ -147,11 +147,11 @@ func handleMeltFileEvent(e fs.Event, f *Furnace) func() {
 			}
 		}
 
-		if f.WatcherSendReloadEvent {
+		if f.watcherSendReloadEvent {
 			f.SendReloadEvent()
 		}
 
-		if f.GenerationOutputFile != "" {
+		if f.generationOutputFile != "" {
 			f.generate()
 		}
 	}
@@ -182,7 +182,7 @@ func (f *Furnace) StartWatcher(extentions []string, paths ...string) {
 				}
 
 				path := formatPath(e.Name)
-				if !hasExtention(path, extentions) || path == f.StyleOutputFile || path == f.OutputFile {
+				if !hasExtention(path, extentions) || path == f.styleOutputFile || path == f.outputFile || path == f.tailwindOutputFile {
 					continue
 				}
 
@@ -190,7 +190,7 @@ func (f *Furnace) StartWatcher(extentions []string, paths ...string) {
 				timer, ok := updates[event]
 
 				if !ok {
-					if filepath.Ext(e.Name) == ".scss" && f.Style {
+					if filepath.Ext(e.Name) == ".scss" && f.style {
 						updates[event] = time.AfterFunc(FILE_EVENT_DELAY, handleStyleFileEvent(f))
 					} else {
 						updates[event] = time.AfterFunc(FILE_EVENT_DELAY, handleMeltFileEvent(e, f))

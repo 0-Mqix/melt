@@ -59,7 +59,7 @@ func (f *Furnace) GetRoot(path string, force bool) (*Root, bool) {
 		return nil, false
 	}
 
-	root, err = f.createRoot(path, bytes.NewBuffer(raw), f.AutoReloadEvent)
+	root, err = f.createRoot(path, bytes.NewBuffer(raw), f.autoReloadEvent)
 
 	if err != nil {
 		fmt.Println("[MELT]", err)
@@ -125,7 +125,7 @@ func (f *Furnace) createRoot(path string, reader io.Reader, withReloadEvents boo
 	buffer := bytes.NewBufferString("")
 
 	if withReloadEvents {
-		appendReloadEventScript(document, f.AutoReloadEventUrl)
+		appendReloadEventScript(document, f.autoReloadEventUrl)
 	}
 
 	html.Render(buffer, document)
