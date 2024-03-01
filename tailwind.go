@@ -11,6 +11,8 @@ func (f *Furnace) runTailwind() {
 		fmt.Println("[MELT] tailwind is not suported in production mode")
 	}
 
+	fmt.Println("[MELT] updating: tailwind")
+
 	outputFile := f.tailwindOutputFile
 
 	if outputFile == "" {

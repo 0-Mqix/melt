@@ -1,7 +1,6 @@
 package melt
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	text "text/template"
+	"time"
 )
 
 type contextValueKey string
@@ -52,6 +52,7 @@ type Furnace struct {
 	subscribersMutex  sync.Mutex
 	lastArgumentId    atomic.Int64
 	dependencyOf      map[string]map[string]bool
+	outputTimer       *time.Timer
 
 	productionMode bool
 }
@@ -163,6 +164,8 @@ func WithOutput(outputFile string) meltOption {
 	return func(f *Furnace) {
 		if outputFile != "" {
 			f.outputFile = formatPath(outputFile)
+			f.outputTimer = time.AfterFunc(OUTPUT_DELAY, f.output)
+			f.outputTimer.Stop()
 		}
 	}
 }
@@ -238,69 +241,6 @@ func writeOutputFile(path string, content []byte) {
 func (f *Furnace) SetGlobalHandlers(handlers map[string]GlobalHandler) {
 	for path, handler := range handlers {
 		f.MustGetComponent(path).SetGlobalHandler(handler)
-	}
-}
-
-func (f *Furnace) Output() {
-	var fileStyles string
-
-	if f.tailwind {
-		f.runTailwind()
-	}
-
-	if f.style {
-		fmt.Println("[MELT] updating: styles")
-		var styles string
-
-		for _, c := range f.Components {
-			styles += c.Style
-		}
-
-		fileStyles = f.transpileStyleFiles()
-		styles = fileStyles + f.sortStyles(styles)
-
-		if f.styleOutputFile != "" {
-			writeOutputFile(f.styleOutputFile, []byte(styles))
-		}
-
-		f.Styles = styles
-	}
-
-	if f.outputFile != "" {
-
-		if f.productionMode {
-			fmt.Println("[MELT] output is currently not suported in production mode")
-			return
-		}
-
-		var output Build
-
-		output.FileStyles = fileStyles
-		output.TailwindStyles = f.TailwindStyles
-
-		for _, c := range f.Components {
-			output.Components = append(output.Components, c)
-		}
-
-		for path := range f.Roots {
-			raw, err := os.ReadFile(path)
-
-			if err != nil {
-				fmt.Println("[MELT] [BUILD]", err)
-				continue
-			}
-
-			root, _ := f.createRoot(path, bytes.NewBuffer(raw), false)
-			output.Roots = append(output.Roots, root)
-		}
-
-		build, err := json.Marshal(output)
-		if err != nil {
-			fmt.Println("[MELT] [BUILD]", err)
-			return
-		}
-
-		writeOutputFile(f.outputFile, build)
 	}
 }
 

@@ -26,7 +26,7 @@ func main() {
 		m = melt.New(
 			melt.WithWatcher("/reload_event", true, true, []string{".html"}, "./templates"),
 			melt.WithOutput("./melt.json"),
-			melt.WithTailwind("tailwindcss", "./tailwind.config.js", "./styles/tailwind.css", ""),
+			melt.WithTailwind("tailwindcss", "./tailwind.config.js", "./styles/tailwind.css", "./static/tailwind.css"),
 			melt.WithStyle("melt", "./styles/main.scss", "./static/style.css"),
 			melt.WithGeneration("./templates/templates.go"),
 		)
@@ -41,17 +41,12 @@ func main() {
 
 	r := chi.NewRouter()
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("index")
+	fs := http.FileServer(http.Dir("./static"))
+	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		root.Write(w, nil, func(w io.Writer) {
 			templates.Index.Write(w, r, nil)
-		})
-	})
-
-	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
-		root.Write(w, nil, func(w io.Writer) {
-			templates.Index.WriteTemplate(w, "test", 2)
 		})
 	})
 

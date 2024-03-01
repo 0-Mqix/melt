@@ -27,7 +27,7 @@ var (
 	}
 )
 
-const FILE_EVENT_DELAY = time.Duration(250 * time.Millisecond)
+const FILE_EVENT_DELAY = time.Duration(50 * time.Millisecond)
 
 func hasExtention(path string, extentions []string) bool {
 	extention := filepath.Ext(path)
@@ -66,13 +66,8 @@ func (f *Furnace) updateDependencies(path string) {
 func handleStyleFileEvent(f *Furnace) func() {
 	return func() {
 		mutex.Lock()
-		defer mutex.Unlock()
-
 		f.Output()
-
-		if f.watcherSendReloadEvent {
-			f.SendReloadEvent()
-		}
+		mutex.Unlock()
 	}
 }
 
@@ -145,10 +140,6 @@ func handleMeltFileEvent(e fs.Event, f *Furnace) func() {
 				delete(f.dependencyOf, path)
 				delete(f.Components, path)
 			}
-		}
-
-		if f.watcherSendReloadEvent {
-			f.SendReloadEvent()
 		}
 
 		if f.generationOutputFile != "" {
