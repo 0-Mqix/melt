@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"os/exec"
 	"sync"
 	"sync/atomic"
 	text "text/template"
@@ -34,7 +35,6 @@ type Furnace struct {
 	generationOutputFile string
 
 	tailwind           bool
-	tailwindExecutable string
 	tailwindInputFile  string
 	tailwindOutputFile string
 	tailwindConfigFile string
@@ -171,6 +171,14 @@ func WithOutput(outputFile string) meltOption {
 }
 
 func WithStyle(prefix, inputPath, outputPath string) meltOption {
+
+	_, err := exec.LookPath("sass")
+
+	if err != nil {
+		fmt.Println("[MELT] [SCSS] please install dart-sass and add it to your path")
+		os.Exit(1)
+	}
+
 	return func(f *Furnace) {
 		f.style = true
 		f.stylePrefix = prefix
@@ -186,10 +194,17 @@ func WithStyle(prefix, inputPath, outputPath string) meltOption {
 	}
 }
 
-func WithTailwind(executable, configPath, inputPath, outputPath string) meltOption {
+func WithTailwind(configPath, inputPath, outputPath string) meltOption {
+
+	_, err := exec.LookPath("tailwindcss")
+
+	if err != nil {
+		fmt.Println("[MELT] [TAILWIND] please install tailwind cli and add it to your path")
+		os.Exit(1)
+	}
+
 	return func(f *Furnace) {
 		f.tailwind = true
-		f.tailwindExecutable = executable
 		f.tailwindConfigFile = formatPath(configPath)
 
 		if inputPath != "" {

@@ -27,7 +27,7 @@ func (f *Furnace) runTailwind() {
 		defer os.Remove(outputFile)
 	}
 
-	cmd := exec.Command(f.tailwindExecutable, "-i", f.tailwindInputFile, "-o", outputFile, "-c", f.tailwindConfigFile, "-m")
+	cmd := exec.Command("tailwindcss", "-i", f.tailwindInputFile, "-o", outputFile, "-c", f.tailwindConfigFile, "-m")
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

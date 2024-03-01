@@ -26,7 +26,8 @@ func main() {
 		m = melt.New(
 			melt.WithWatcher("/reload_event", true, true, []string{".html"}, "./templates"),
 			melt.WithOutput("./melt.json"),
-			melt.WithTailwind("tailwindcss", "./tailwind.config.js", "./styles/tailwind.css", "./static/tailwind.css"),
+			melt.WithStyle("melt", "", ""),
+			melt.WithTailwind("./tailwind.config.js", "./styles/tailwind.css", "./static/tailwind.css"),
 			melt.WithGeneration("./templates/templates.go"),
 		)
 	} else {
