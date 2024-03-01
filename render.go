@@ -225,16 +225,18 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 			result, ok := getPair(n)
 
 			if ok {
-
 				if result.Key[0] != '$' {
 					fmt.Printf("[MELT] default is only supported for $ variables\n-> %s -> <default>%s %s</default>\n", path, result.Key, result.Value)
 					break
 				}
-
 				defaults[result.Key] = result.Value
 			}
 
 		case "style":
+			if !f.style {
+				melted = append(melted, n)
+				break
+			}
 			result, ok := getStyle(n)
 			if ok {
 				if !f.style {
@@ -247,7 +249,6 @@ func (f *Furnace) Render(name string, reader io.Reader, path string) (*Component
 				}
 				style += result
 			}
-
 		default:
 			melted = append(melted, n)
 		}
