@@ -18,9 +18,9 @@ type generationData struct {
 	calls
 }
 
-func Generate(file string, extentions []string, paths ...string) {
+func Generate(file string, printRenderOutput bool, extentions []string, paths ...string) {
 
-	m := New(WithGeneration(file), WithPrintRenderOutput(true))
+	m := New(WithGeneration(file), WithPrintRenderOutput(printRenderOutput))
 
 	for _, path := range paths {
 

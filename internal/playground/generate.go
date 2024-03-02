@@ -7,5 +7,5 @@ import (
 )
 
 func main() {
-	melt.Generate("./templates/templates.go", []string{".html"}, "./templates")
+	melt.Generate("./templates/templates.go", false, []string{".html"}, "./templates")
 }

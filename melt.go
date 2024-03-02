@@ -164,8 +164,6 @@ func WithOutput(outputFile string) meltOption {
 	return func(f *Furnace) {
 		if outputFile != "" {
 			f.outputFile = formatPath(outputFile)
-			f.outputTimer = time.AfterFunc(OUTPUT_DELAY, f.output)
-			f.outputTimer.Stop()
 		}
 	}
 }

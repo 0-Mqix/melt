@@ -12,6 +12,11 @@ import (
 const OUTPUT_DELAY = time.Millisecond * 100
 
 func (f *Furnace) Output() {
+
+	if f.outputTimer == nil {
+		f.outputTimer = time.AfterFunc(OUTPUT_DELAY, f.output)
+	}
+
 	f.outputTimer.Reset(OUTPUT_DELAY)
 }
 
